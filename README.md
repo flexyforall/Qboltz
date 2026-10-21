@@ -9,7 +9,8 @@ Video seeking needs HTTP Range support. Every real host has it, but `python3 -m 
 ## How it works
 
 - **Intro**: the background video (`assets/video/hero.*`) plays once and stops on its last frame,
-  the flare. The logo and the "Where machines think with photons." headline then fade in.
+  the flare. The logo, the "Where machines think with photons." headline and the "Talk to us"
+  aperture button then fade in.
   If the visitor scrolls before the video ends, it jumps ahead to the flare.
 - **Scroll storyboard**: one sticky 1440×800 stage. Each Figma frame is a keyframe in
   `assets/js/main.js` (`P.f2 … P.f8`):
@@ -20,8 +21,10 @@ Video seeking needs HTTP Range support. Every real host has it, but `python3 -m 
   5. f8: white final scene with the CTA
 - **Text reveal on scroll** (like drone.riotters.com): each scene text arrives dim and its glyphs
   light up one after another as you scroll. It ends exactly on the Figma state. See `Reveal` in `main.js`.
-- **Hover text roll** (like izum.study buttons): header tabs, the header "Talk to us" and the big CTA.
+- **Hover text roll** (like izum.study buttons): header tabs, the header "Talk to us", the hero button and the big CTA.
   Letters slide up one by one while copies roll in from below. Any element with `data-roll` gets it.
+- **Big CTA states** (Figma component 769:163): Default is the image with a soft-light blue tint.
+  Hover crossfades to the darker image with a 60% black overlay.
 - **Pixel accuracy**: all sizes are design pixels. The stage is scaled by `--k = min(vw/1440, vh/800)`,
   so a 1440×800 viewport renders 1:1 with Figma.
 
@@ -31,9 +34,9 @@ Video seeking needs HTTP Range support. Every real host has it, but `python3 -m 
 assets/
   css/style.css         styles (gradients copied from Figma as SVG data URIs)
   js/main.js            intro + scroll timeline
-  fonts/                Host Grotesk (variable, latin + latin-ext, from Google Fonts)
+  fonts/                Host Grotesk (variable, latin + latin-ext) and Geist Mono (hero button), from Google Fonts
   icons/                SVGs exported from Figma (logos, menu brackets, button corners, frame brackets, plus)
-  images/button-bg.png  "Talk to us" button fill (Figma)
+  images/button-bg*.png "Talk to us" button fills, Default and Hover (Figma)
   images/hero-poster.jpg first video frame (poster)
   images/noise.png      grain that reproduces Figma's Noise effect on the gradient frames
   video/hero.webm|mp4   intro video (WebM for Chrome/Firefox, MP4 fallback for Safari)

@@ -14,6 +14,13 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../fonts/GeistMono-latin.woff2") format("woff2");
+}
+@font-face {
   font-family: "Host Grotesk";
   font-style: normal;
   font-weight: 300 800;
@@ -189,36 +196,87 @@ a { color: inherit; text-decoration: none; }
   pointer-events: none;
 }
 
-/* Frame 2147226041 (769:748): x 335, y 412, 750 × 230.27 */
+/* Scroll-driven wrapper: keeps the text block larger than the shrinking card (frames 3–4) */
+.hero__shift {
+  position: absolute;
+  inset: 0;
+  transform-origin: 720px 505.4px; /* center of the text block */
+}
+
+/* Frame 2147226041 (816:4124): y 338.84, 726 × 333.11, centered horizontally
+   (Figma has it at x 324.3, i.e. 33px left of center) */
 .hero__content {
   position: absolute;
-  left: 335px;
-  top: 412px;
-  width: 750px;
+  left: 357px;
+  top: 338.839px;
+  width: 726px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 40px;
+  gap: 60px;
   opacity: 0;
   transform: translateY(16px);
   transition: opacity 1.2s cubic-bezier(.22, .61, .36, 1), transform 1.2s cubic-bezier(.22, .61, .36, 1);
 }
 .is-revealed .hero__content { opacity: 1; transform: none; }
 
-.hero__logo { width: 207.437px; height: 36.273px; }
+.hero__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.hero__logo { width: 200.811px; height: 35.114px; }
 
 .hero__title {
   font-weight: 400;
-  font-size: 86.031px;
+  font-size: 83.283px;
   line-height: 0.9;
   text-align: center;
   white-space: nowrap;
   color: transparent;
-  background-image: linear-gradient(86.37949870837723deg, #fff 16.491%, rgba(255, 255, 255, 0.8) 65.741%, rgba(255, 255, 255, 0.1) 98.313%);
+  background-image: linear-gradient(86.40183851591054deg, #fff 16.491%, rgba(255, 255, 255, 0.8) 65.741%, rgba(255, 255, 255, 0.1) 98.313%);
   -webkit-background-clip: text;
   background-clip: text;
 }
+
+/* Button / Aperture (816:4129): 190 × 64, padding 6 */
+.btn-aperture {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  padding: 6px;
+  color: var(--white);
+}
+.btn-aperture__body {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 24px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(50px);
+  backdrop-filter: blur(50px);
+  transition: background-color 0.3s ease;
+}
+.btn-aperture:hover .btn-aperture__body,
+.btn-aperture:focus-visible .btn-aperture__body { background: rgba(255, 255, 255, 0.2); }
+.btn-aperture__label {
+  width: 130px; /* Figma hugs the label without the trailing letter-spacing */
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 21px;
+  letter-spacing: 3.68px;
+  white-space: nowrap;
+}
+.btn-aperture__corner { position: absolute; width: 8px; height: 8px; }
+.btn-aperture__corner--tl { left: 0; top: 0; }
+.btn-aperture__corner--tr { right: 0; top: 0; }
+.btn-aperture__corner--bl { left: 0; bottom: 0; }
+.btn-aperture__corner--br { right: 0; bottom: 0; }
 
 /* --------------------------------------------------------------------------
    Scenes (frames 4–8)
@@ -354,19 +412,41 @@ a { color: inherit; text-decoration: none; }
   isolation: isolate;
 }
 /* image fill spans the whole node under the 2px stroke, like in Figma */
-.cta-btn__bg {
+.cta-btn__fill {
   position: absolute;
   left: -2px;
   top: -2px;
   width: 438px;
   height: 148px;
-  object-fit: fill;
   border-radius: 32px;
+  overflow: hidden;
+  isolation: isolate;
   pointer-events: none;
-  transition: transform 0.6s cubic-bezier(.22, .61, .36, 1);
   z-index: -1;
 }
-.cta-btn:hover .cta-btn__bg { transform: scale(1.04); }
+.cta-btn__bg,
+.cta-btn__tint,
+.cta-btn__shade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 32px;
+  transition: opacity 0.5s cubic-bezier(.22, .61, .36, 1);
+}
+.cta-btn__bg { object-fit: fill; }
+/* State=Default: image + rgba(0,50,167,.5) soft-light */
+.cta-btn__tint { background: rgba(0, 50, 167, 0.5); mix-blend-mode: soft-light; }
+/* State=Hover: darker image + rgba(0,0,0,.6) */
+.cta-btn__bg--hover,
+.cta-btn__shade { opacity: 0; }
+.cta-btn__shade { background: rgba(0, 0, 0, 0.6); }
+.cta-btn:hover .cta-btn__bg--hover,
+.cta-btn:hover .cta-btn__shade,
+.cta-btn:focus-visible .cta-btn__bg--hover,
+.cta-btn:focus-visible .cta-btn__shade { opacity: 1; }
+.cta-btn:hover .cta-btn__tint,
+.cta-btn:focus-visible .cta-btn__tint { opacity: 0; }
 .cta-btn__inner {
   display: flex;
   align-items: center;
@@ -598,6 +678,8 @@ a:focus-visible { outline: 1px solid rgba(var(--fg), 0.6); outline-offset: 2px; 
 .menu-item:focus-visible .roll__ch,
 .btn-framed:hover .roll__ch,
 .btn-framed:focus-visible .roll__ch,
+.btn-aperture:hover .roll__ch,
+.btn-aperture:focus-visible .roll__ch,
 .cta-btn:hover .roll__ch,
 .cta-btn:focus-visible .roll__ch { transform: translateY(-100%); }
 

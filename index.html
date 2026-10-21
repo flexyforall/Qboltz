@@ -6,6 +6,7 @@
   <title>Qboltz — Where machines think with photons</title>
   <meta name="description" content="Qboltz is building a new kind of co-processor for decisions that can't wait." />
   <link rel="preload" href="assets/fonts/HostGrotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="assets/fonts/GeistMono-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="assets/css/style.css" />
 </head>
 <body class="is-intro">
@@ -30,9 +31,20 @@
           <source src="assets/video/hero.mp4" type="video/mp4" />
         </video>
         <div class="board board--contain">
-          <div class="hero__content">
-            <img class="hero__logo" src="assets/icons/logo-hero.svg" width="207.437" height="36.273" alt="Qboltz" />
-            <h1 class="hero__title">Where machines<br />think with photons.</h1>
+          <div class="hero__shift">
+            <div class="hero__content">
+              <div class="hero__brand">
+                <img class="hero__logo" src="assets/icons/logo-hero.svg" width="200.811" height="35.114" alt="Qboltz" />
+                <h1 class="hero__title">Where machines<br />think with photons.</h1>
+              </div>
+              <a class="btn-aperture" href="#contact" data-goto="f8">
+                <span class="btn-aperture__body"><span class="btn-aperture__label" data-roll>TALK TO US</span></span>
+                <img class="btn-aperture__corner btn-aperture__corner--tl" src="assets/icons/corner-tl.svg" width="8" height="8" alt="" />
+                <img class="btn-aperture__corner btn-aperture__corner--tr" src="assets/icons/corner-tr.svg" width="8" height="8" alt="" />
+                <img class="btn-aperture__corner btn-aperture__corner--bl" src="assets/icons/corner-bl.svg" width="8" height="8" alt="" />
+                <img class="btn-aperture__corner btn-aperture__corner--br" src="assets/icons/corner-br.svg" width="8" height="8" alt="" />
+              </a>
+            </div>
           </div>
         </div>
       </section>
@@ -58,7 +70,12 @@
           <p class="final__title grad-text grad-text--c">Co-processor for the<br />quickest decisions.</p>
           <div class="final__cta">
             <a class="cta-btn" href="#contact">
-              <img class="cta-btn__bg" src="assets/images/button-bg.png" alt="" aria-hidden="true" />
+              <span class="cta-btn__fill" aria-hidden="true">
+                <img class="cta-btn__bg" src="assets/images/button-bg.png" alt="" />
+                <img class="cta-btn__bg cta-btn__bg--hover" src="assets/images/button-bg-hover.png" alt="" />
+                <span class="cta-btn__tint"></span>
+                <span class="cta-btn__shade"></span>
+              </span>
               <span class="cta-btn__inner">
                 <span class="cta-btn__icon"><img src="assets/icons/plus.svg" width="18" height="18" alt="" /></span>
                 <span class="cta-btn__label" data-roll>Talk to us</span>

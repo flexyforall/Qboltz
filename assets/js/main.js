@@ -31,6 +31,7 @@
   var body = document.body;
   var story = document.querySelector(".story");
   var hero = document.querySelector(".hero");
+  var heroShift = document.querySelector(".hero__shift");
   var video = document.querySelector(".hero__video");
   var header = document.querySelector(".header-wrap");
   var loader = document.querySelector(".loader");
@@ -209,13 +210,17 @@
 
     if (p > 0.02) skipIntro();
 
-    // Hero card: f2 full-bleed → f3 scale .968 (radius) → f4 scale .9236, y −268 → out
+    // Hero card: f2 full-bleed → f3 scale .968 (radius) → f4 scale .918, y −180 → out
     var a = ramp(p, P.f2, P.f3);
     var b = ramp(p, P.f3, P.f4);
     var c = ramp(p, P.f4, P.f5);
-    var scale = p < P.f3 ? lerp(1, 1394 / 1440, a) : lerp(1394 / 1440, 1330 / 1440, b);
-    var ty = p < P.f4 ? lerp(0, -268.222, b) : lerp(-268.222, -820, c);
+    var scale = p < P.f3 ? lerp(1, 1394 / 1440, a) : lerp(1394 / 1440, 1322 / 1440, b);
+    var ty = p < P.f4 ? lerp(0, -180, b) : lerp(-180, -820, c);
     hero.style.transform = "translate3d(0," + (ty * k).toFixed(2) + "px,0) scale(" + scale.toFixed(5) + ")";
+    // the text block doesn't shrink with the card (726 → 726 → 688 wide) and sits a bit lower
+    var cs = p < P.f3 ? lerp(1, 1440 / 1394, a) : lerp(1440 / 1394, 688 * 1440 / (726 * 1322), b);
+    var cy = p < P.f3 ? lerp(0, 16.67, a) : lerp(16.67, 14.85, b);
+    heroShift.style.transform = "translate3d(0," + cy.toFixed(2) + "px,0) scale(" + cs.toFixed(5) + ")";
     hero.style.borderRadius = (36 * k * a).toFixed(2) + "px";
     hero.style.opacity = (p < P.f4 ? lerp(1, 0.8, b) : lerp(0.8, 0, c)).toFixed(3);
     hero.style.visibility = c >= 1 ? "hidden" : "visible";
