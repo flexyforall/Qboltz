@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Qboltz — Where machines think with photons</title>
+  <meta name="description" content="Qboltz is building a new kind of co-processor for decisions that can't wait." />
+  <link rel="preload" href="assets/fonts/HostGrotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body class="is-intro">
+  <main class="story" id="top">
+    <div class="stage">
+
+      <!-- Backgrounds (cover-scaled 1440×800 artboard) -->
+      <div class="bg" aria-hidden="true">
+        <div class="bg__board">
+          <div class="bg__layer bg__layer--f5"></div>
+          <div class="bg__layer bg__layer--f6"></div>
+          <div class="bg__layer bg__layer--f7"></div>
+          <div class="bg__layer bg__layer--f8"><div class="bg__glow-f8"></div></div>
+        </div>
+        <div class="bg__grain"></div>
+      </div>
+
+      <!-- Hero: video intro → card that shrinks and scrolls away -->
+      <section class="hero" aria-label="Qboltz">
+        <video class="hero__video" poster="assets/images/hero-poster.jpg" autoplay muted playsinline preload="auto">
+          <source src="assets/video/hero.webm" type="video/webm" />
+          <source src="assets/video/hero.mp4" type="video/mp4" />
+        </video>
+        <div class="board board--contain">
+          <div class="hero__content">
+            <img class="hero__logo" src="assets/icons/logo-hero.svg" width="207.437" height="36.273" alt="Qboltz" />
+            <h1 class="hero__title">Where machines<br />think with photons.</h1>
+          </div>
+        </div>
+      </section>
+
+      <!-- Scroll scenes (contain-scaled 1440×800 artboard) -->
+      <div class="board board--contain scenes">
+        <img class="frame-brackets" src="assets/icons/frame-brackets.svg" width="1019" height="446" alt="" aria-hidden="true" />
+
+        <div class="scene scene--1" id="mission">
+          <p class="scene__text scene__text--flat">We're building a new kind<br />of co-processor for<br />decisions that can't wait.</p>
+          <p class="scene__text grad-text grad-text--a">We're building a new kind<br />of co-processor for<br />decisions that can't wait.</p>
+        </div>
+
+        <div class="scene scene--2">
+          <p class="scene__text grad-text grad-text--a">More possible answers<br />than the universe has had<br />seconds.</p>
+        </div>
+
+        <div class="scene scene--3">
+          <p class="scene__text scene__text--wide grad-text grad-text--b">2,000,000 variables.<br />Solved with light.</p>
+        </div>
+
+        <div class="scene scene--final" id="contact">
+          <p class="final__title grad-text grad-text--c">Co-processor for the<br />quickest decisions.</p>
+          <div class="final__cta">
+            <a class="cta-btn" href="#contact">
+              <img class="cta-btn__bg" src="assets/images/button-bg.png" alt="" aria-hidden="true" />
+              <span class="cta-btn__inner">
+                <span class="cta-btn__icon"><img src="assets/icons/plus.svg" width="18" height="18" alt="" /></span>
+                <span class="cta-btn__label">Talk to us</span>
+              </span>
+            </a>
+            <p class="final__caption">NEW KIND OF CO-PROCESSOR</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Left progress loader -->
+      <div class="loader" aria-hidden="true">
+        <div class="loader__top">
+          <span class="loader__bar"></span>
+          <span class="loader__num">01</span>
+        </div>
+        <div class="loader__lines">
+          <span class="loader__line"></span>
+          <span class="loader__line"></span>
+          <span class="loader__line"></span>
+        </div>
+      </div>
+
+      <!-- Header -->
+      <header class="header-wrap">
+        <nav class="header" aria-label="Main">
+          <a class="header__logo" href="#top" aria-label="Qboltz home">
+            <span class="header__logo-box"><img src="assets/icons/logo-header.svg" width="132.69" height="12.9" alt="" /></span>
+          </a>
+          <div class="header__menu">
+            <a class="menu-item menu-item--mission" href="#mission" data-goto="f5">
+              <img class="ico" src="assets/icons/bracket-l.svg" width="5" height="28" alt="" />
+              <span class="menu-item__dot"></span>
+              <span class="menu-item__label">mission</span>
+              <img class="ico" src="assets/icons/bracket-r.svg" width="5" height="28" alt="" />
+            </a>
+            <a class="menu-item menu-item--industries" href="#industries">
+              <img class="ico" src="assets/icons/bracket-l.svg" width="5" height="28" alt="" />
+              <span class="menu-item__dot"></span>
+              <span class="menu-item__label">industries</span>
+              <img class="ico" src="assets/icons/bracket-r.svg" width="5" height="28" alt="" />
+            </a>
+          </div>
+          <a class="btn-framed" href="#contact" data-goto="f8">
+            <span class="btn-framed__label">Talk to us</span>
+            <img class="ico btn-framed__corner btn-framed__corner--tl" src="assets/icons/corner-tl.svg" width="8" height="8" alt="" />
+            <img class="ico btn-framed__corner btn-framed__corner--tr" src="assets/icons/corner-tr.svg" width="8" height="8" alt="" />
+            <img class="ico btn-framed__corner btn-framed__corner--bl" src="assets/icons/corner-bl.svg" width="8" height="8" alt="" />
+            <img class="ico btn-framed__corner btn-framed__corner--br" src="assets/icons/corner-br.svg" width="8" height="8" alt="" />
+          </a>
+        </nav>
+      </header>
+
+    </div>
+  </main>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
