@@ -14,13 +14,14 @@
     f3: 0.6,
     f4: 1.4,
     f5: 2.4,
-    f5h: 2.9,
-    f6: 3.7,
-    f6h: 4.2,
-    f7: 5.0,
-    f7h: 5.5,
-    f8: 6.3,
-    end: 6.8
+    f5h: 3.4,
+    f6: 4.2,
+    f6h: 5.2,
+    f7: 6.0,
+    f7h: 7.0,
+    f8: 7.8,
+    f8h: 8.6,
+    end: 9.0
   };
   var M56 = (P.f5h + P.f6) / 2;
   var M67 = (P.f6h + P.f7) / 2;
@@ -47,6 +48,7 @@
   var s2 = document.querySelector(".scene--2");
   var s3 = document.querySelector(".scene--3");
   var sFinal = document.querySelector(".scene--final");
+  var sFinalTitle = sFinal.querySelector(".final__title");
 
   var k = 1;
   var vh = window.innerHeight;
@@ -110,6 +112,93 @@
       else video.addEventListener("loadedmetadata", showLastFrame, { once: true });
     });
   }
+
+  /* ---------- text reveal on scroll (drone.riotters.com style) ----------
+     Each glyph becomes its own span; it goes from a dim state to the full
+     Figma gradient as the scroll front passes it. background-clip:text does
+     not survive opacity on child spans, so every span gets the paragraph's
+     gradient, sized to the paragraph and shifted by the span's offset. */
+
+  var REVEAL_DIM = 0.16;
+  var REVEAL_SPREAD = 10; // glyphs in the soft front
+
+  function Reveal(el) {
+    this.el = el;
+    this.bg = getComputedStyle(el).backgroundImage;
+    this.chars = [];
+    this.last = -1;
+    var self = this;
+    var nodes = Array.prototype.slice.call(el.childNodes);
+    el.textContent = "";
+    nodes.forEach(function (node) {
+      if (node.nodeType !== 3) { el.appendChild(node); return; }
+      var text = node.nodeValue;
+      for (var i = 0; i < text.length; i++) {
+        var ch = text[i];
+        if (ch === " ") { el.appendChild(document.createTextNode(" ")); continue; }
+        var span = document.createElement("span");
+        span.className = "rv";
+        span.textContent = ch;
+        span.style.backgroundImage = self.bg;
+        el.appendChild(span);
+        self.chars.push(span);
+      }
+    });
+    el.classList.add("is-split");
+    el.setAttribute("aria-label", el.textContent);
+  }
+
+  Reveal.prototype.layout = function () {
+    var w = this.el.offsetWidth, h = this.el.offsetHeight;
+    this.chars.forEach(function (span) {
+      span.style.backgroundSize = w + "px " + h + "px";
+      span.style.backgroundPosition = -span.offsetLeft + "px " + -span.offsetTop + "px";
+    });
+  };
+
+  Reveal.prototype.set = function (r) {
+    r = Math.round(r * 1000) / 1000;
+    if (r === this.last) return;
+    this.last = r;
+    var front = r * (this.chars.length + REVEAL_SPREAD);
+    for (var i = 0; i < this.chars.length; i++) {
+      var v = clamp01((front - i) / REVEAL_SPREAD);
+      this.chars[i].style.opacity = (REVEAL_DIM + (1 - REVEAL_DIM) * v).toFixed(3);
+    }
+  };
+
+  var reveals = [
+    { r: new Reveal(s1grad), from: P.f5 - 0.4, to: P.f5h - 0.15 },
+    { r: new Reveal(s2.querySelector(".grad-text")), from: P.f6 - 0.3, to: P.f6h - 0.15 },
+    { r: new Reveal(s3.querySelector(".grad-text")), from: P.f7 - 0.3, to: P.f7h - 0.15 },
+    { r: new Reveal(sFinalTitle), from: P.f8 - 0.3, to: P.f8h }
+  ];
+
+  function layoutReveals() {
+    reveals.forEach(function (x) { x.r.layout(); });
+  }
+
+  /* ---------- hover text roll (izum.study style) ----------
+     Letters slide up one after another while their copies roll in from below. */
+
+  document.querySelectorAll("[data-roll]").forEach(function (el) {
+    var text = el.textContent;
+    var roll = document.createElement("span");
+    roll.className = "roll";
+    roll.setAttribute("aria-hidden", "true");
+    for (var i = 0; i < text.length; i++) {
+      var ch = document.createElement("span");
+      ch.className = "roll__ch";
+      ch.textContent = text[i];
+      ch.setAttribute("data-ch", text[i]);
+      ch.style.setProperty("--i", i);
+      roll.appendChild(ch);
+    }
+    el.textContent = "";
+    el.appendChild(roll);
+    var link = el.closest("a");
+    if (link && !link.hasAttribute("aria-label")) link.setAttribute("aria-label", text.trim());
+  });
 
   /* ---------- scroll timeline ---------- */
 
@@ -181,6 +270,8 @@
     var fin = ramp(p, M78, P.f8);
     sceneCross(sFinal, fin, 0);
     sFinal.style.pointerEvents = fin > 0.5 ? "auto" : "none";
+
+    reveals.forEach(function (x) { x.r.set(clamp01((p - x.from) / (x.to - x.from))); });
   }
 
   function sceneCross(el, inT, outT) {
@@ -211,9 +302,11 @@
   });
 
   window.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", function () { measure(); render(); });
+  window.addEventListener("resize", function () { measure(); layoutReveals(); render(); });
 
   if ("scrollRestoration" in history) history.scrollRestoration = "manual";
   measure();
+  layoutReveals();
   render();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutReveals);
 })();

@@ -16,8 +16,12 @@ Video seeking needs HTTP Range support. Every real host has it, but `python3 -m 
   1. f2: hero
   2. f3: header appears and the hero becomes a card
   3. f4: the card leaves and "We're building…" comes in
-  4. f5–f7: purple gradient scenes, 01 → 03
+  4. f5–f7: purple gradient scenes, 01 → 03, each with a hold (`f5h`, `f6h`, `f7h`) for the text reveal
   5. f8: white final scene with the CTA
+- **Text reveal on scroll** (like drone.riotters.com): each scene text arrives dim and its glyphs
+  light up one after another as you scroll. It ends exactly on the Figma state. See `Reveal` in `main.js`.
+- **Hover text roll** (like izum.study buttons): header tabs, the header "Talk to us" and the big CTA.
+  Letters slide up one by one while copies roll in from below. Any element with `data-roll` gets it.
 - **Pixel accuracy**: all sizes are design pixels. The stage is scaled by `--k = min(vw/1440, vh/800)`,
   so a 1440×800 viewport renders 1:1 with Figma.
 
