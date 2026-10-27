@@ -10,7 +10,7 @@ geometry, materials, animation, camera, compositor and render settings.
 | `lighthouse` (option 1) | 12 s, 289 frames | The light appears among the orbiting dots. 3 beams sweep slowly like a lighthouse, and the blue scan haze lights the particles it passes. The sweep eases onto one cluster, the light flies there, the beams open into an X-flare and fold into one line, then one star floats off to the upper right with a trail. |
 | `search` (option 2) | 15 s, 361 frames | The camera dollies through the field. A fan of 4 beams snaps from one candidate cluster to the next. Each candidate pulses, gets rejected, dims and drifts off. The light locks on the right one: all beams merge into one line, the cluster tightens and flares, the light glides into it, absorbs it and leaves on an arc. |
 
-Previews (low-res Cycles test renders): `previews/answer.mp4` (1280×720), `previews/lighthouse.mp4`, `previews/search.mp4` (480×270).
+Previews (low-res Cycles test renders): `previews/answer.mp4` (960×540), `previews/lighthouse.mp4`, `previews/search.mp4` (480×270).
 
 ## Run
 
