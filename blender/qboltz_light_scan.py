@@ -42,7 +42,7 @@ import bpy  # before bmesh, so it also works with the pip `bpy` module
 import bmesh
 from mathutils import Quaternion, Vector
 
-VARIANT = "lighthouse"  # "lighthouse" (option 1) or "search" (option 2)
+VARIANT = "answer"  # "answer" (the final one), "lighthouse" (option 1) or "search" (option 2)
 ENGINE = "eevee"        # "eevee" or "cycles"
 RES_X, RES_Y = 1920, 1080
 FPS = 24
@@ -916,9 +916,433 @@ def build_search(scene, rng):
     return duration
 
 
+# --------------------------------------------------------------------------- option 3: the answer
+
+class Track:
+    """Smooth curve through (time, value) keys: cubic Hermite with Catmull-Rom tangents.
+    A key equal to its neighbour is a hold (zero tangent), so holds never overshoot."""
+
+    def __init__(self, keys):
+        self.keys = sorted(keys, key=lambda k: k[0])
+
+    def _tangent(self, i):
+        ks = self.keys
+        p = ks[i][1]
+        if i == 0 or i == len(ks) - 1 or ks[i - 1][1] == p or ks[i + 1][1] == p:
+            return p * 0
+        return (ks[i + 1][1] - ks[i - 1][1]) / (ks[i + 1][0] - ks[i - 1][0])
+
+    def __call__(self, t):
+        ks = self.keys
+        if t <= ks[0][0]:
+            return ks[0][1]
+        if t >= ks[-1][0]:
+            return ks[-1][1]
+        i = max(j for j in range(len(ks) - 1) if ks[j][0] <= t)
+        (t0, p0), (t1, p1) = ks[i], ks[i + 1]
+        h = t1 - t0
+        s = (t - t0) / h
+        h00, h10 = 2 * s ** 3 - 3 * s ** 2 + 1, s ** 3 - 2 * s ** 2 + s
+        h01, h11 = -2 * s ** 3 + 3 * s ** 2, s ** 3 - s ** 2
+        return h00 * p0 + h10 * h * self._tangent(i) + h01 * p1 + h11 * h * self._tangent(i + 1)
+
+
+def ramp(t, t0, t1, a, b, ease=smooth):
+    return a + (b - a) * ease((t - t0) / (t1 - t0)) if t1 > t0 else (b if t >= t1 else a)
+
+
+def simple_glow_material(name, strength, color=(1, 1, 1), power=0):
+    """Plain additive emission. power > 0 softens it towards the silhouette (a halo)."""
+    return glow_sphere_material(name, color, strength, power)
+
+
+def answer_ray_material(name, strength):
+    """A line through the hub. LenPos / LenNeg set how far it reaches on each side."""
+    mat, nb = new_material(name, additive=True)
+    v = {k: nb.value(k, d) for k, d in (("Master", 0.0), ("LenPos", 14.0), ("LenNeg", 14.0))}
+    _, _, z = nb.xyz(nb.obj_coords())
+    pos = nb.maprange(z, 0.0, v["LenPos"].outputs[0], 1.0, 0.0, smooth=True)
+    neg = nb.maprange(nb.math("MULTIPLY", z, -1.0), 0.0, v["LenNeg"].outputs[0], 1.0, 0.0, smooth=True)
+    fade = nb.math("ADD", nb.mul(pos, nb.math("GREATER_THAN", z, 0.0)),
+                   nb.mul(neg, nb.math("LESS_THAN", z, 0.0)))
+    s = nb.mul(strength, fade, nb.near_camera_fade(0.5, 5.0), v["Master"].outputs[0])
+    nb.output(nb.emission((1, 1, 1), s), additive=True)
+    return mat, v
+
+
+def answer_dot_material(name, ray_pivots, base=0.9):
+    """Plain round dots that brighten when any ray passes close to them."""
+    mat, nb = new_material(name, additive=False)
+    vals = {"Base": nb.value("Base", base)}
+    lit = 0.0
+    for i, pivot in enumerate(ray_pivots):
+        vals[f"I{i}"] = nb.value(f"I{i}", 0.0)
+        x, y, z = nb.xyz(nb.obj_coords(pivot))
+        near = nb.maprange(nb.length(nb.combine(x, y, 0.0)), 0.0, 0.35, 1.0, 0.0, smooth=True)
+        along = nb.maprange(nb.math("ABSOLUTE", z), 0.0, 14.0, 1.0, 0.0)
+        term = nb.mul(near, along, vals[f"I{i}"].outputs[0])
+        lit = term if i == 0 else nb.math("ADD", lit, term)
+    info = nb.node("ShaderNodeObjectInfo")
+    rnd = nb.maprange(info.outputs["Random"], 0.0, 1.0, 0.5, 1.2)
+    s = nb.mul(vals["Base"].outputs[0], rnd, nb.math("ADD", 1.0, nb.mul(lit, 9.0)))
+    nb.output(nb.emission((1, 1, 1), s), additive=False)
+    return mat, vals
+
+
+def streak_node_group():
+    """Points -> ico-spheres stretched along local Z (the tunnel streaks)."""
+    ng = bpy.data.node_groups.new("QB_Streaks", "GeometryNodeTree")
+    it = ng.interface
+    it.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    it.new_socket("Material", in_out="INPUT", socket_type="NodeSocketMaterial")
+    it.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    nb = NB(ng)
+    gi, go = nb.node("NodeGroupInput"), nb.node("NodeGroupOutput")
+    ico = nb.node("GeometryNodeMeshIcoSphere")
+    ico.inputs["Radius"].default_value = 1.0
+    ico.inputs["Subdivisions"].default_value = 2
+    setmat = nb.node("GeometryNodeSetMaterial")
+    nb.put(setmat.inputs["Geometry"], ico.outputs["Mesh"])
+    nb.put(setmat.inputs["Material"], gi.outputs["Material"])
+    iop = nb.node("GeometryNodeInstanceOnPoints")
+    nb.put(iop.inputs["Points"], gi.outputs["Geometry"])
+    nb.put(iop.inputs["Instance"], setmat.outputs[0])
+    iop.inputs["Scale"].default_value = (0.004, 0.004, 0.3)
+    nb.put(go.inputs[0], iop.outputs[0])
+    return ng
+
+
+def camera_rotation(forward, roll):
+    q = forward.normalized().to_track_quat("-Z", "Y")
+    return Quaternion(forward.normalized(), roll) @ q
+
+
+def build_answer(scene, rng):
+    """
+    Option 3, "The Answer". A plain movement reference: emissive dots and lines, no effects.
+      0-7    a hub sends out 5 rays of different strength; each sweeps the 3D dot field on its own
+      7-9    a faint ray settles on one dot (the answer) and brightens; the others fade out
+      9-12   the camera swings behind the hub and follows the ray; the hub joins the answer
+      12-15  into the light: a tunnel of streaks along the ray, a light at its far end
+      15-19  still moving forward, out through the tunnel wall; the far light with the tunnel
+             trailing behind it settles into the hero frame (light at 72% / 33%), then holds
+    """
+    duration = 20.5
+    A = Vector((0.0, 0.0, 0.0))                       # the answer
+    u = Vector((1.0, -0.25, 0.10)).normalized()       # the winning ray (hub -> answer -> tunnel)
+    H = A - 6.0 * u                                   # the hub
+    E = A + 34.0 * u                                  # the light at the end of the tunnel
+    up = Vector((0, 0, 1))
+    right = u.cross(up).normalized()                  # camera-right while looking down the tunnel
+    lift = Vector((0, 0, 0.25))                       # keeps the camera just off the ray's axis
+
+    # final frame: E at 72% across / 33% down (the site's hero), seen from beside the tunnel
+    res_x, res_y = PLAIN["answer"]
+    tan_h = 18.0 / 35.0
+    tan_v = tan_h * res_y / res_x
+    target_ndc = ((0.72 - 0.5) * 2, (0.5 - 0.33) * 2)
+    to_E = (Quaternion(up, math.radians(28)) @ u + Vector((0, 0, -0.04))).normalized()
+    Cf = E - 15.0 * to_E
+
+    def screen(fwd_vec, direction):
+        c = camera_rotation(fwd_vec, 0.0).inverted() @ direction
+        return (c.x / -c.z) / tan_h, (c.y / -c.z) / tan_v
+
+    def aim(direction, ndc):
+        """Level camera forward that puts `direction` at screen position `ndc`."""
+        yaw, pitch = math.atan2(direction.y, direction.x), math.asin(direction.z)
+        for _ in range(30):
+            def fv(y_, p_):
+                return Vector((math.cos(p_) * math.cos(y_), math.cos(p_) * math.sin(y_), math.sin(p_)))
+            x0, y0 = screen(fv(yaw, pitch), direction)
+            ex, ey = x0 - ndc[0], y0 - ndc[1]
+            if abs(ex) + abs(ey) < 1e-6:
+                break
+            e = 1e-4
+            xa, ya = screen(fv(yaw + e, pitch), direction)
+            xb, yb = screen(fv(yaw, pitch + e), direction)
+            j = ((xa - x0) / e, (xb - x0) / e, (ya - y0) / e, (yb - y0) / e)
+            det = j[0] * j[3] - j[1] * j[2]
+            yaw -= (j[3] * ex - j[1] * ey) / det
+            pitch -= (-j[2] * ex + j[0] * ey) / det
+        return fv(yaw, pitch)
+
+    final_fwd = aim(to_E, target_ndc)
+
+    # camera ------------------------------------------------------------------
+    # The path (where the camera goes) and the timing (how fast it goes there) are separate:
+    # positions come from a smooth curve through the waypoints, re-parameterised by arc length,
+    # and the distance travelled over time is its own smooth curve, so the speed never stutters.
+    C0, T0 = H + Vector((-2.5, -8.5, 1.2)), H + Vector((-2.0, 0.0, -0.35))
+    C1, T1 = H + Vector((-0.6, -7.6, 0.5)), H + Vector((-1.8, 0.3, -0.3))
+    M = H + Vector((-3.0, -3.2, 0.9))
+    exit_pt = A + 16.0 * u + 1.2 * right + Vector((0, 0, 0.3))
+    #           waypoint                                   looking along                                roll
+    waypoints = [(C0, (T0 - C0).normalized(), 0.0),
+                 (C1, (T1 - C1).normalized(), 0.0),
+                 (M, (H + u - M).normalized(), 0.0),
+                 (H - 2.2 * u + lift, u, 0.0),             # behind the hub, on the ray
+                 (A - 2.0 * u + lift, u, 0.0),
+                 (A + lift, u, 0.0),                       # into the light
+                 (A + 4.0 * u + lift, u, 0.25),
+                 (A + 12.0 * u + lift, u, 0.35),
+                 (exit_pt, (u + final_fwd).normalized(), 0.12),   # out through the wall
+                 (Cf, final_fwd, 0.0)]
+    chord = [0.0]
+    for (a_, _, _), (b_, _, _) in zip(waypoints, waypoints[1:]):
+        chord.append(chord[-1] + (b_ - a_).length)
+    geo = Track([(c, w[0]) for c, w in zip(chord, waypoints)])
+    n_arc = 4000
+    arc_c = [chord[-1] * k / n_arc for k in range(n_arc + 1)]
+    arc_len = [0.0]
+    prev = geo(0.0)
+    for c in arc_c[1:]:
+        p = geo(c)
+        arc_len.append(arc_len[-1] + (p - prev).length)
+        prev = p
+
+    def c_of_s(s_):
+        lo, hi = 0, n_arc
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            lo, hi = (mid, hi) if arc_len[mid] <= s_ else (lo, mid)
+        k = (s_ - arc_len[lo]) / max(arc_len[hi] - arc_len[lo], 1e-9)
+        return arc_c[lo] + k * (arc_c[hi] - arc_c[lo])
+
+    def s_of_c(c):
+        k = min(int(c / chord[-1] * n_arc), n_arc - 1)
+        return arc_len[k] + (arc_len[k + 1] - arc_len[k]) * (c / chord[-1] * n_arc - k)
+
+    wp_s = [s_of_c(c) for c in chord]
+    fwd = Track([(sv, w[1]) for sv, w in zip(wp_s, waypoints)])
+    roll = Track([(sv, w[2]) for sv, w in zip(wp_s, waypoints)])
+
+    # distance along the path over time: (time, waypoint index, speed in units/s)
+    timing = [(0.0, 0, 0.15), (6.5, 1, 0.6), (11.9, 5, 5.0), (14.4, 7, 5.0), (18.6, 9, 0.0)]
+
+    def dist(t):
+        if t >= timing[-1][0]:
+            return wp_s[-1]
+        i = max(j for j in range(len(timing) - 1) if timing[j][0] <= t)
+        (t0, i0, v0), (t1, i1, v1) = timing[i], timing[i + 1]
+        h = t1 - t0
+        x = (t - t0) / h
+        s0, s1 = wp_s[i0], wp_s[i1]
+        return ((2 * x ** 3 - 3 * x ** 2 + 1) * s0 + (x ** 3 - 2 * x ** 2 + x) * h * v0
+                + (-2 * x ** 3 + 3 * x ** 2) * s1 + (x ** 3 - x ** 2) * h * v1)
+
+    def cam_pos(t):
+        return geo(c_of_s(dist(t)))
+
+    def time_at(s_):
+        lo, hi = 0.0, duration
+        for _ in range(40):
+            mid = (lo + hi) / 2
+            lo, hi = (mid, hi) if dist(mid) < s_ else (lo, mid)
+        return lo
+
+    # the hub flies ahead of the camera along the ray and joins the answer
+    s_hub0, s_hub1 = wp_s[2] + 0.5 * (wp_s[3] - wp_s[2]), wp_s[4]
+    t_merge = time_at(s_hub1)
+    t_in = timing[2][0]                      # camera enters the light
+    t_out = time_at(wp_s[8])                 # camera leaves the tunnel
+
+    cam_data = bpy.data.cameras.new("QB_Camera")
+    cam_data.lens = 35.0
+    cam_data.clip_start = 0.02
+    cam_data.clip_end = 300
+    cam = link(scene, bpy.data.objects.new("QB_Camera", cam_data))
+    cam.rotation_mode = "QUATERNION"
+    scene.camera = cam
+
+    # hub + rays ----------------------------------------------------------------
+    hub = new_empty(scene, "QB_Hub", size=0.4)
+    hub_core_mat, hub_core = simple_glow_material("QB_HubCore", 0.0)
+    hub_halo_mat, hub_halo = simple_glow_material("QB_HubHalo", 0.0, (0.9, 0.92, 1.0), power=6)
+    mesh_object(scene, "QB_HubCore", sphere(0.05, 16), hub, hub_core_mat)
+    mesh_object(scene, "QB_HubHalo", sphere(0.2, 24), hub, hub_halo_mat)
+
+    #        yaw0  yaw/s  wobble wob-f pitch0 p-amp  p-f   phase strength radius
+    specs = [(2.4, 0.42, 0.5, 0.31, 0.25, 0.45, 0.27, 0.0, 1.00, 0.011),   # lead
+             (-0.6, -0.33, 0.7, 0.23, -0.35, 0.5, 0.36, 1.3, 0.55, 0.008),  # medium
+             (0.9, 0.27, 0.4, 0.41, 0.6, 0.35, 0.21, 2.1, 0.45, 0.007),     # medium
+             (0.0, 0.50, 0.6, 0.29, 0.0, 0.6, 0.33, 0.7, 0.28, 0.005),      # faint: the winner
+             (3.6, -0.45, 0.5, 0.37, -0.5, 0.4, 0.44, 2.8, 0.20, 0.0045)]   # faint
+    WIN = 3
+
+    def free_angles(spec, t):
+        y0, ys, wob, wf, p0, pa, pf, ph = spec[:8]
+        return y0 + ys * t + wob * math.sin(wf * t + ph), p0 + pa * math.sin(pf * t + ph)
+
+    # aim the winner's own sweep so that it crosses the answer at 7.4 s on its own
+    t_lock = 7.4
+    yw, pw = free_angles(specs[WIN], t_lock)
+    yu, pu = math.atan2(u.y, u.x), math.asin(u.z)
+    s = list(specs[WIN])
+    s[0] += yu - yw
+    s[4] += pu - pw
+    specs[WIN] = tuple(s)
+
+    def free_dir(spec, t):
+        yaw, pitch = free_angles(spec, t)
+        return Vector((math.cos(pitch) * math.cos(yaw), math.cos(pitch) * math.sin(yaw), math.sin(pitch)))
+
+    pivots, ray_vals, lines = [], [], []
+    for i, sp in enumerate(specs):
+        pivot = new_empty(scene, f"QB_Ray{i}", hub, size=0.2)
+        pivot.rotation_mode = "QUATERNION"
+        mat, vals = answer_ray_material(f"QB_Ray{i}", 30.0)
+        lines.append(mesh_object(scene, f"QB_Ray{i}_Line", cylinder(sp[9], -32.0, 32.0, 8), pivot, mat))
+        pivots.append(pivot)
+        ray_vals.append(vals)
+
+    fades = {0: (8.2, 9.4), 1: (7.6, 8.6), 2: (7.9, 8.9), 4: (7.5, 8.3)}
+
+    def ray_strength(i, t):
+        sp = specs[i]
+        env = ramp(t, 1.6 + 0.3 * i, 2.6 + 0.3 * i, 0.0, 1.0)
+        flicker = 1.0 if sp[8] > 0.4 else 0.78 + 0.22 * math.sin(9.1 * t + sp[7]) * math.sin(5.3 * t)
+        if i == WIN:  # brightens as it locks on; hands over to the tail once we are out
+            return ramp(t, 7.4, 8.4, sp[8] * flicker * env, 1.25) * ramp(t, t_out, t_out + 1.5, 1.0, 0.0)
+        a, b = fades[i]
+        return sp[8] * flicker * env * ramp(t, a, b, 1.0, 0.0)
+
+    def ray_direction(i, t):
+        d = free_dir(specs[i], t)
+        if i == WIN:
+            d = d.slerp(u, smoother((t - 6.6) / 1.6))
+        return d
+
+    # the answer: an ordinary dot until a ray settles on it --------------------------
+    ans = new_empty(scene, "QB_Answer", size=0.3)
+    ans.location = A
+    ans_core_mat, ans_core = simple_glow_material("QB_AnswerCore", 0.9)
+    ans_halo_mat, ans_halo = simple_glow_material("QB_AnswerHalo", 0.0, (0.9, 0.92, 1.0), power=6)
+    ans_core_obj = mesh_object(scene, "QB_AnswerCore", sphere(0.025, 16), ans, ans_core_mat)
+    mesh_object(scene, "QB_AnswerHalo", sphere(0.25, 24), ans, ans_halo_mat)
+
+    # the light at the end of the tunnel, and the tail it keeps in the final frame -------------
+    end = new_empty(scene, "QB_EndLight", size=0.3)
+    end.location = E
+    end_core_mat, end_core = simple_glow_material("QB_EndCore", 0.0)
+    end_halo_mat, end_halo = simple_glow_material("QB_EndHalo", 0.0, (0.9, 0.92, 1.0), power=6)
+    mesh_object(scene, "QB_EndCore", sphere(0.05, 16), end, end_core_mat)
+    mesh_object(scene, "QB_EndHalo", sphere(0.35, 24), end, end_halo_mat)
+    tail = new_empty(scene, "QB_Tail", end, size=0.2)
+    tail.rotation_mode = "QUATERNION"
+    tail.rotation_quaternion = (-u).to_track_quat("Z", "Y")
+    tail_mat, tail_vals = answer_ray_material("QB_Tail", 30.0)
+    tail_vals["LenPos"].outputs[0].default_value = 6.5
+    tail_vals["LenNeg"].outputs[0].default_value = 0.01
+    mesh_object(scene, "QB_Tail_Line", cylinder(0.012, 0.0, 7.0, 8), tail, tail_mat)
+
+    # dots ------------------------------------------------------------------------
+    cam_samples = [cam_pos(f / FPS) for f in range(0, F(duration), 2)]
+    pts = []
+    for _ in range(9000):
+        pts.append(Vector((rng.uniform(-16, 42), rng.uniform(-22, 20), rng.uniform(-10, 9))))
+    for center, count in ((E, 9), (A, 4), (H, 5)):
+        for _ in range(count):
+            radius = rng.uniform(2.0, 12.0)
+            n = (random_unit(rng) + Vector((0, 0, rng.uniform(0.5, 2.0)))).normalized()
+            a_ = n.orthogonal().normalized()
+            b_ = n.cross(a_)
+            start, arc = rng.uniform(0, 2 * math.pi), rng.uniform(0.4, 1.0) * 2 * math.pi
+            for _ in range(int(arc * radius * 6)):
+                ang = start + rng.uniform(0, arc)
+                pts.append(center + radius * (math.cos(ang) * a_ + math.sin(ang) * b_)
+                           + Vector((rng.gauss(0, 0.04), rng.gauss(0, 0.04), rng.gauss(0, 0.04))))
+    keep = []
+    for p in pts:
+        if min((p - A).length, (p - H).length, (p - E).length) < 0.5:
+            continue
+        if any((p - c).length < 1.0 for c in cam_samples):
+            continue
+        keep.append(p)
+    ng = drift_node_group()
+    dot_mat, dot_vals = answer_dot_material("QB_Dots", pivots)
+    points_object(scene, "QB_Dots", keep, ng, dot_mat, Radius=0.02, Amplitude=0.12, Speed=0.05)
+
+    # the tunnel: thin streaks on a tube from the answer to the far light ------------------
+    tube = []
+    for _ in range(4500):
+        a = rng.uniform(0, 2 * math.pi)
+        r = 0.7 + rng.gauss(0, 0.05)
+        tube.append(Vector((r * math.cos(a), r * math.sin(a), rng.uniform(0.8, (E - A).length - 1.5))))
+    tunnel_mat, tunnel_val = simple_glow_material("QB_Tunnel", 0.0)
+    tme = bpy.data.meshes.new("QB_Tunnel")
+    tme.from_pydata([tuple(p) for p in tube], [], [])
+    tunnel = link(scene, bpy.data.objects.new("QB_Tunnel", tme))
+    tunnel.location = A
+    tunnel.rotation_mode = "QUATERNION"
+    tunnel.rotation_quaternion = u.to_track_quat("Z", "Y")
+    mod = tunnel.modifiers.new("Streaks", "NODES")
+    mod.node_group = streak_node_group()
+    props = getattr(getattr(mod, "properties", None), "inputs", None)
+    for item in mod.node_group.interface.items_tree:
+        if getattr(item, "in_out", None) == "INPUT" and item.name == "Material":
+            if props is not None:
+                getattr(props, item.identifier).value = tunnel_mat
+            else:
+                mod[item.identifier] = tunnel_mat
+
+    # key every frame -------------------------------------------------------------------
+    with Interp("LINEAR"):
+        for f in range(1, F(duration) + 1):
+            t = (f - 1) / FPS
+            s_cam = dist(t)
+            cam.location = geo(c_of_s(s_cam))
+            cam.rotation_quaternion = camera_rotation(fwd(s_cam), roll(s_cam))
+            cam.keyframe_insert("location", frame=f)
+            cam.keyframe_insert("rotation_quaternion", frame=f)
+
+            hub.location = H.lerp(A, smoother((s_cam - s_hub0) / (s_hub1 - s_hub0)))
+            hub.keyframe_insert("location", frame=f)
+            hub.scale = (1, 1, 1) if t < t_merge else (0.001,) * 3   # joins the answer
+            hub.keyframe_insert("scale", frame=f)
+            key_val(hub_core, t, ramp(t, 0.0, 1.0, 0.0, 40.0))
+            key_val(hub_halo, t, ramp(t, 0.0, 1.0, 0.0, 0.6))
+
+            for i, pivot in enumerate(pivots):
+                d = ray_direction(i, t)
+                key_quat(pivot, t, d.to_track_quat("Z", "Y"))
+                st = ray_strength(i, t)
+                key_val(ray_vals[i]["Master"], t, st)
+                key_val(dot_vals[f"I{i}"], t, st)
+            wv = ray_vals[WIN]
+            key_val(wv["LenPos"], t, ramp(t, t_merge, t_merge + 1.0, 14.0, 30.0))
+            key_val(wv["LenNeg"], t, ramp(t, t_merge, t_merge + 1.8, 14.0, 1.0))
+            w = ramp(t, 7.4, 8.4, 1.0, 1.6)
+            lines[WIN].scale = (w, w, 1.0)
+            lines[WIN].keyframe_insert("scale", frame=f)
+
+            found = ramp(t, 7.8, 8.4, 0.0, 1.0)
+            flare = ramp(t, t_merge - 0.1, t_merge + 0.05, 0.0, 1.0) * ramp(t, t_merge + 0.05, t_merge + 1.0, 1.0, 0.0)
+            merged = ramp(t, t_merge - 0.1, t_merge + 0.05, 0.0, 1.0)
+            passed = ramp(t, t_in - 0.05, t_in + 0.4, 1.0, 0.0)     # we are inside it now
+            key_val(ans_core, t, (0.9 + 7.0 * found + 30.0 * merged + 40.0 * flare) * passed)
+            key_val(ans_halo, t, (0.4 * found + 0.6 * merged + 1.2 * flare) * passed)
+            ans_core_obj.scale = (1 + merged,) * 3
+            ans_core_obj.keyframe_insert("scale", frame=f)
+
+            lit = ramp(t, t_in - 0.3, t_in + 0.4, 0.0, 1.0)
+            key_val(end_core, t, 40.0 * lit)
+            key_val(end_halo, t, 0.9 * lit)
+            key_val(tail_vals["Master"], t, ramp(t, t_out, t_out + 1.5, 0.0, 1.0))
+            tun = lit * ramp(t, t_out + 0.5, t_out + 2.5, 1.0, 0.0)
+            key_val(tunnel_val, t, 2.0 * tun)
+    return duration
+
+
 # --------------------------------------------------------------------------- main
 
-BUILDERS = {"lighthouse": ("QB_Lighthouse", build_lighthouse), "search": ("QB_Search", build_search)}
+BUILDERS = {
+    "lighthouse": ("QB_Lighthouse", build_lighthouse),
+    "search": ("QB_Search", build_search),
+    "answer": ("QB_Answer", build_answer),
+}
+# "answer" is a plain movement reference: site-hero size, no glare
+PLAIN = {"answer": (1440, 800)}
 
 
 def parse_args():
@@ -947,11 +1371,15 @@ def build(variant=VARIANT, engine=ENGINE, scale=100, samples=None):
     scene.render.fps = FPS
     scene.frame_start = 1
     scene.frame_end = F(duration)
-    scene.render.resolution_x, scene.render.resolution_y = RES_X, RES_Y
+    scene.render.resolution_x, scene.render.resolution_y = PLAIN.get(variant, (RES_X, RES_Y))
     scene.render.resolution_percentage = scale
     set_engine(scene, engine, samples)
     set_output(scene, f"//renders/qboltz_{variant}_")
-    setup_compositor(scene)
+    if variant not in PLAIN:
+        setup_compositor(scene)
+    elif scene.render.engine == "CYCLES":
+        scene.cycles.use_denoising = False  # plain emitters: a few samples are already clean
+        scene.cycles.max_bounces = 0
     for obj in scene.objects:
         obj.pop("_qprev", None)
     scene.frame_set(1)
