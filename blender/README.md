@@ -6,11 +6,11 @@ geometry, materials, animation, camera, compositor and render settings.
 
 | Variant | Length | What happens |
 | --- | --- | --- |
-| `answer` (final, default) | 20.5 s, 493 frames, 1440×800 | **Plain movement reference**, with no effects: just emissive dots and lines. A hub sends out 5 rays of different strength, and each sweeps the 3D dot field on its own while the dots brighten as rays pass. A faint ray settles on one dot (the answer) and brightens while the others fade. The camera swings behind the hub and follows the ray, and the hub flies ahead and joins the answer. We go into the light, through a tunnel of streaks toward a light at its far end, then slide out through the tunnel wall while still moving forward. The tunnel shrinks behind that light like a tail and settles into the site's hero frame (light at 72% across, 33% down, tail to the left), then holds. |
+| `answer` (final, default) | ~18 s, 430 frames, 1280×720 | **Plain movement reference**, built so video-to-video AI restyling (e.g. Higgsfield) can follow it: one continuous shot, 16:9, thick rays and big, sparse dots, no effects. A hub, dead centre, sends out 5 rays of different strength. Each ray sweeps the 3D dot field on its own while the camera orbits the hub, and dots brighten as rays pass. At 5 s a faint ray settles on one dot (the answer) and brightens while the others fade. The camera swings behind the hub and follows the ray, and the hub flies ahead and joins the answer. We go into the light and through a tunnel of streaks toward a light at its far end. Still moving forward, we slide out through the tunnel wall and ease to rest. The tunnel shrinks behind that light like a tail, settling into the site's hero frame (light at 72% across, 33% down, tail to the left), which holds for 1.4 s. |
 | `lighthouse` (option 1) | 12 s, 289 frames | The light appears among the orbiting dots. 3 beams sweep slowly like a lighthouse, and the blue scan haze lights the particles it passes. The sweep eases onto one cluster, the light flies there, the beams open into an X-flare and fold into one line, then one star floats off to the upper right with a trail. |
 | `search` (option 2) | 15 s, 361 frames | The camera dollies through the field. A fan of 4 beams snaps from one candidate cluster to the next. Each candidate pulses, gets rejected, dims and drifts off. The light locks on the right one: all beams merge into one line, the cluster tightens and flares, the light glides into it, absorbs it and leaves on an arc. |
 
-Previews (low-res Cycles test renders): `previews/answer.mp4` (720×400), `previews/lighthouse.mp4`, `previews/search.mp4` (480×270).
+Previews (low-res Cycles test renders): `previews/answer.mp4` (1280×720), `previews/lighthouse.mp4`, `previews/search.mp4` (480×270).
 
 ## Run
 
@@ -38,14 +38,16 @@ Options: `--variant`, `--engine eevee|cycles`, `--scale <percent>`, `--samples N
 ## How `answer` is built
 
 - Everything is plain emission, with no compositor, volumes or depth of field, so it renders fast.
-  It's meant as a motion reference to restyle later.
+  It's meant as a motion reference to restyle later. Restyle models keep big shapes and redraw fine detail,
+  so the rays are thick, the dots are big and sparse, and lines fade out near the camera (no wedges).
 - **Camera**: the path is a smooth curve through waypoints, re-parameterised by arc length.
-  The timing is a separate distance-over-time curve, so speed and direction never hitch. To retime
+  The timing is a separate distance-over-time curve, so speed and direction never hitch. The last
+  glide is timed as a pure ease-out, so the camera comes to rest without a jolt. To retime
   the shot, edit `timing` (time, waypoint, speed). To change the route, edit `waypoints`.
 - **The final frame is solved, not eyeballed**: `aim()` finds the camera direction that puts the end light
   exactly at 72% / 33% of the frame.
 - **Rays**: each one sweeps on its own yaw and pitch curve. The winner's sweep is phase-shifted
-  so it crosses the answer at 7.4 s by itself, then eases in and holds.
+  so it crosses the answer at 5 s by itself, then eases in and holds.
 - The hub's flight, the merge, the tunnel and the tail are all timed off the camera, so they
   stay in sync if you retime it.
 
