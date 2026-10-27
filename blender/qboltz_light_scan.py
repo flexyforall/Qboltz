@@ -1073,15 +1073,15 @@ def build_answer(scene, rng):
     # The path (where the camera goes) and the timing (how fast it goes there) are separate:
     # positions come from a smooth curve through the waypoints, re-parameterised by arc length,
     # and the distance travelled over time is its own smooth curve, so the speed never stutters.
-    C0, T0 = H + Vector((-2.5, -8.5, 1.2)), H + Vector((-2.0, 0.0, -0.35))
-    C1, T1 = H + Vector((-0.6, -7.6, 0.5)), H + Vector((-1.8, 0.3, -0.3))
-    M = H + Vector((-3.0, -3.2, 0.9))
+    C0, T0 = H + Vector((-2.5, -8.5, 1.2)), H     # the hub starts dead centre; the camera
+    C1, T1 = H + Vector((-0.6, -7.6, 0.5)), H     # slowly orbits it, keeping it there
+    M = H + Vector((-3.8, -4.0, 0.9))
     exit_pt = A + 16.0 * u + 1.2 * right + Vector((0, 0, 0.3))
     #           waypoint                                   looking along                                roll
     waypoints = [(C0, (T0 - C0).normalized(), 0.0),
                  (C1, (T1 - C1).normalized(), 0.0),
                  (M, (H + u - M).normalized(), 0.0),
-                 (H - 2.2 * u + lift, u, 0.0),             # behind the hub, on the ray
+                 (H - 3.5 * u + lift, u, 0.0),             # behind the hub, on the ray
                  (A - 2.0 * u + lift, u, 0.0),
                  (A + lift, u, 0.0),                       # into the light
                  (A + 4.0 * u + lift, u, 0.25),
@@ -1286,18 +1286,39 @@ def build_answer(scene, rng):
             else:
                 mod[item.identifier] = tunnel_mat
 
+    # camera aim: keep the hub dead centre (also while chasing it down the ray); once the hub
+    # has joined the answer, hand over to looking down the tunnel. The aim is then smoothed over
+    # time (gaussian, ~0.4 s) so swinging past the hub never whips the camera round.
+    frames = range(1, F(duration) + 1)
+    s_of_t = [dist((f - 1) / FPS) for f in frames]
+    hub_at = [H.lerp(A, smoother((sc - s_hub0) / (s_hub1 - s_hub0))) for sc in s_of_t]
+    cam_at = [geo(c_of_s(sc)) for sc in s_of_t]
+    raw = []
+    for sc, hp, cp in zip(s_of_t, hub_at, cam_at):
+        at_hub = (hp - cp).normalized()
+        k = smoother((sc - s_hub1) / (wp_s[5] - s_hub1))
+        raw.append(at_hub.slerp(fwd(sc).normalized(), k) if sc < wp_s[5] else fwd(sc).normalized())
+    sigma = 0.4 * FPS
+    taps = range(-int(3 * sigma), int(3 * sigma) + 1)
+    weights = [math.exp(-0.5 * (j / sigma) ** 2) for j in taps]
+    looks = []
+    for i in range(len(raw)):
+        v = Vector((0, 0, 0))
+        for j, w_ in zip(taps, weights):
+            v += w_ * raw[min(max(i + j, 0), len(raw) - 1)]
+        looks.append(v.normalized())
+
     # key every frame -------------------------------------------------------------------
     with Interp("LINEAR"):
-        for f in range(1, F(duration) + 1):
+        for f in frames:
             t = (f - 1) / FPS
-            s_cam = dist(t)
-            cam.location = geo(c_of_s(s_cam))
-            cam.rotation_quaternion = camera_rotation(fwd(s_cam), roll(s_cam))
+            s_cam = s_of_t[f - 1]
+            hub.location = hub_at[f - 1]
+            hub.keyframe_insert("location", frame=f)
+            cam.location = cam_at[f - 1]
+            cam.rotation_quaternion = camera_rotation(looks[f - 1], roll(s_cam))
             cam.keyframe_insert("location", frame=f)
             cam.keyframe_insert("rotation_quaternion", frame=f)
-
-            hub.location = H.lerp(A, smoother((s_cam - s_hub0) / (s_hub1 - s_hub0)))
-            hub.keyframe_insert("location", frame=f)
             hub.scale = (1, 1, 1) if t < t_merge else (0.001,) * 3   # joins the answer
             hub.keyframe_insert("scale", frame=f)
             key_val(hub_core, t, ramp(t, 0.0, 1.0, 0.0, 40.0))
