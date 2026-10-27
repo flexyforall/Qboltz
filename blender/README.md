@@ -6,7 +6,7 @@ geometry, materials, animation, camera, compositor and render settings.
 
 | Variant | Length | What happens |
 | --- | --- | --- |
-| `answer` (final, default) | ~19 s, 459 frames, 1280×720 | **Placeholder movement reference** for video-to-video restyling (e.g. Higgsfield): one continuous shot, 16:9, a readable 3D scene without heavy effects. The hub, dead centre, ignites and 5 rays of different strength grow out of it one after another, while orbit rings and dots at every depth make the camera orbit easy to read. Each ray scans on its own, and dots brighten as rays pass. At 5 s a faint ray settles on one dot (the answer). The others keep scanning but steer clear of it. A pulse of light runs down the winning ray, and the camera pushes in until that ray is the only light in frame, chasing the pulse into the dot. Only inside the dot does the tunnel of streaks appear. Still moving forward, we slide out through the tunnel wall and ease to rest. The tunnel shrinks behind the far light like a tail, settling into the site's hero frame (light at 72% across, 33% down, tail to the left). |
+| `answer` (final, default) | 18 s, 432 frames, 1280×720 | **Placeholder movement reference** for video-to-video restyling (e.g. Higgsfield): one continuous shot with glow, star glints, blue-violet haze and depth of field, and nothing pops in or out. The hub, dead centre, ignites and 5 rays of different strength grow out of it one after another, then scan the 3D dot field while the camera orbits. As a faint ray sweeps towards an ordinary dot (there from the first frame), the camera starts turning to it. The ray lands on the dot (the part beyond it pulls back) and the dot ignites. The camera follows alongside the ray, flies past the dot with it in frame the whole time, and eases onto the site's hero frame: the dot at 72% across, 33% down, its ray trailing left. The other rays keep scanning and only pull back into the hub once it is out of view. |
 | `lighthouse` (option 1) | 12 s, 289 frames | The light appears among the orbiting dots. 3 beams sweep slowly like a lighthouse, and the blue scan haze lights the particles it passes. The sweep eases onto one cluster, the light flies there, the beams open into an X-flare and fold into one line, then one star floats off to the upper right with a trail. |
 | `search` (option 2) | 15 s, 361 frames | The camera dollies through the field. A fan of 4 beams snaps from one candidate cluster to the next. Each candidate pulses, gets rejected, dims and drifts off. The light locks on the right one: all beams merge into one line, the cluster tightens and flares, the light glides into it, absorbs it and leaves on an arc. |
 
@@ -37,9 +37,9 @@ Options: `--variant`, `--engine eevee|cycles`, `--scale <percent>`, `--samples N
 
 ## How `answer` is built
 
-- Everything is plain emission, with no compositor, volumes or depth of field, so it renders fast.
-  It's meant as a motion reference to restyle later. Restyle models keep big shapes and redraw fine detail,
-  so the rays are thick, the dots are big and sparse, and lines fade out near the camera (no wedges).
+- A placeholder look with enough mood for a restyle to latch on to: emission plus compositor glow, star glints,
+  a soft blue-violet haze around the rays and depth of field. Restyle models keep big shapes and redraw
+  fine detail, so the rays are thick and the dots big and sparse.
 - **Camera**: the path is a smooth curve through waypoints, re-parameterised by arc length.
   The timing is a separate distance-over-time curve, so speed and direction never hitch. The last
   glide is timed as a pure ease-out, so the camera comes to rest without a jolt. To retime
@@ -48,8 +48,9 @@ Options: `--variant`, `--engine eevee|cycles`, `--scale <percent>`, `--samples N
   exactly at 72% / 33% of the frame.
 - **Rays**: each one sweeps on its own yaw and pitch curve. The winner's sweep is phase-shifted
   so it crosses the answer at 5 s by itself, then eases in and holds.
-- The hub's flight, the merge, the tunnel and the tail are all timed off the camera, so they
-  stay in sync if you retime it.
+- Nothing appears or disappears on screen: the found dot exists from the first frame, the followed ray
+  never fades, and the other rays only retract into the hub after the camera has turned away from it
+  (worked out from the camera, so it stays true if you retime the shot).
 
 ## How `lighthouse` / `search` are built
 
