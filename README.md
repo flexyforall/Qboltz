@@ -41,3 +41,9 @@ assets/
   images/noise.png      grain that reproduces Figma's Noise effect on the gradient frames
   video/hero.webm|mp4   intro video (WebM for Chrome/Firefox, MP4 fallback for Safari)
 ```
+
+## Blender: Light Scan scenes
+
+`blender/qboltz_light_scan.py` generates two animated Blender scenes in which a floating light
+scans round drifting particles, picks the right spot and floats away as one light.
+See [`blender/README.md`](blender/README.md).
