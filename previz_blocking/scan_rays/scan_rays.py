@@ -1,6 +1,7 @@
-"""scan_rays -- six searching light rays from one hub. The camera flies in and
-settles level with the hub, orbits it in a slow half circle -- always facing it --
-and ends opposite ray C, then glides past the hub and rides out along C.
+"""scan_rays (v2, 12 s) -- six searching light rays from one hub. The camera flies
+in and settles level with the hub, arcs round it to the right -- always facing it --
+and ends opposite ray C. Every ray folds into C, the camera passes over the hub
+and flies on above the one beam. v1 (21 s, half orbit): ../scan_rays_v1_21s/
 
     python3 scan_rays.py          -> writes rays.json (ray angles per frame)
     python3 solve_shot.py scan_rays.py  -> solves + gates the camera, bake.json
@@ -10,7 +11,7 @@ running out along ray C. It is hidden in the build.
 """
 import math, json, os
 
-FPS, SECONDS = 24, 21.0
+FPS, SECONDS = 24, 12.0
 NF = int(round(FPS * SECONDS))
 HUB = (0.0, 0.0, 1.2)
 RAY_LEN = 150.0
@@ -22,28 +23,30 @@ def win(t, a, b, c, d):            # 0 -> 1 over a..b, hold, 1 -> 0 over c..d
 
 # base azimuth (deg), colour, and the chaos phases of each ray
 RAYS = [
-    dict(name="A", az=-30, color="cyan",   w=(0.71, 1.13, 0.53, 0.97), p=(0.3, 2.1, 1.0, 4.0)),
+    # A pitched down 8 deg: it sweeps across the camera's arc, and this keeps it
+    # passing under the lens (>= 0.59 m) instead of through it
+    dict(name="A", az=-30, color="cyan",   w=(0.71, 1.13, 0.53, 0.97), p=(0.3, 2.1, 1.0, 4.0), el_bias=-8),
     dict(name="B", az= 30, color="green",  w=(0.83, 0.59, 1.07, 0.61), p=(1.7, 0.4, 2.6, 0.9)),
-    dict(name="C", az=250, color="red",    w=(0.64, 1.21, 0.77, 0.49), p=(2.9, 1.3, 0.2, 3.3)),
+    dict(name="C", az=180, color="red",    w=(0.64, 1.21, 0.77, 0.49), p=(2.9, 1.3, 0.2, 3.3)),
     dict(name="D", az=150, color="yellow", w=(0.92, 0.67, 0.58, 1.17), p=(0.8, 3.7, 1.9, 2.2)),
-    dict(name="E", az=190, color="yellow", w=(0.57, 1.03, 0.89, 0.73), p=(3.4, 0.6, 2.8, 1.4)),
+    dict(name="E", az=250, color="yellow", w=(0.57, 1.03, 0.89, 0.73), p=(3.4, 0.6, 2.8, 1.4)),
     dict(name="F", az= 90, color="yellow", w=(1.09, 0.79, 0.66, 0.84), p=(2.2, 2.9, 3.9, 0.1)),
 ]
 AZ_AMP, EL_MID, EL_AMP = math.radians(38), math.radians(9), math.radians(13)
 
 IC = 2                             # ray C, the one everything ends on
-C_SETTLE = (10.5, 13.0)            # ray C stops searching and holds a heading
+C_SETTLE = (5.0, 7.5)            # ray C stops searching and holds a heading
 # every other ray folds INTO ray C: same heading, same pitch, one beam. Each
 # swings the short way round, which here is always away from the camera.
-MERGE_T0, MERGE_T1 = 12.75, 15.0   # frame 306 -> 360
+MERGE_T0, MERGE_T1 = 8.0, 10.25    # frame 192 -> 246 (same 2.25 s fold)
 # once they are one beam, light runs out along it
-PULSE_T0, PULSE_V0, PULSE_V1 = 15.2, 6.0, 30.0
-C_HOLD_AZ, C_HOLD_EL = math.radians(250), math.radians(5)
+PULSE_T0, PULSE_V0, PULSE_V1 = 10.4, 6.0, 30.0
+C_HOLD_AZ, C_HOLD_EL = math.radians(180), math.radians(5)
 
 def ray_angles(i, t):
     r = RAYS[i]; w, p = r["w"], r["p"]
     az = math.radians(r["az"]) + AZ_AMP * (0.6 * math.sin(w[0] * t + p[0]) + 0.4 * math.sin(w[1] * t + p[1]))
-    el = EL_MID + EL_AMP * (0.55 * math.sin(w[2] * t + p[2]) + 0.45 * math.sin(w[3] * t + p[3]))
+    el = EL_MID + math.radians(r.get("el_bias", 0)) + EL_AMP * (0.55 * math.sin(w[2] * t + p[2]) + 0.45 * math.sin(w[3] * t + p[3]))
     if r["name"] == "C":
         s = sm((t - C_SETTLE[0]) / (C_SETTLE[1] - C_SETTLE[0]))
         hold_az = C_HOLD_AZ + math.radians(3) * math.sin(0.4 * t)   # slow living drift
@@ -83,8 +86,8 @@ ORB_R = 3.6                           # orbit radius once arrived
 # a half circle to the camera's RIGHT (CCW from above), always facing the hub.
 # Trapezoid angular speed: ease in, cruise, ease out -- the cruise is what keeps
 # it a slow turn instead of a swing. It ends exactly opposite ray C's heading.
-ORB_A0, ORB_SWEEP = math.radians(-110), math.radians(180)
-ORB_T0, ORB_T1, ORB_RAMP = 3.0, 13.6, 2.4
+ORB_A0, ORB_SWEEP = math.radians(-110), math.radians(110)
+ORB_T0, ORB_T1, ORB_RAMP = 1.4, 8.8, 2.4   # same ~22 deg/s cruise, less arc
 def _orb_v(t):
     return sm((t - ORB_T0) / ORB_RAMP) * (1.0 - sm((t - (ORB_T1 - ORB_RAMP)) / ORB_RAMP))
 _ORB = _integrate(_orb_v)
@@ -94,11 +97,11 @@ def orbit_angle(t): return ORB_A0 + ORB_SWEEP * _ORB(t) / _ORB(SECONDS)
 # from the far side of the hub (frame 306), drift slowly straight at it, lift
 # and pass right OVER it while the rays fold into C, then fly on above the one
 # beam. Slow approach speed, then ease up to a cruise -- never lands.
-def _ride_v(t): return 1.3 * sm((t - 11.6) / 2.0) + 1.1 * sm((t - 15.6) / 2.2)
+def _ride_v(t): return 1.3 * sm((t - 6.8) / 2.0) + 1.1 * sm((t - 10.0) / 2.2)
 _RIDE = _integrate(_ride_v)
 def ride_s(t): return -ORB_R + _RIDE(t)
 
-def w_ride(t): return sm((t - 11.8) / 3.2)
+def w_ride(t): return sm((t - 7.0) / 3.2)
 
 def _frame(az, u, v, h):
     return [HUB[0] + u * math.cos(az) - v * math.sin(az),
@@ -128,7 +131,7 @@ def subj_wp(t):
 STEP = 0.25
 TS = [round(k * STEP, 3) for k in range(int(SECONDS / STEP) + 1)]
 def LENS(t):                       # wide on the fly-in, a touch tighter round the hub, wide ride
-    return lerp(lerp(24, 28, sm((t - 3.0) / 4.0)), lerp(28, 20, sm((t - 14.0) / 4.0)), w_ride(t))
+    return lerp(lerp(24, 28, sm((t - 1.5) / 3.5)), lerp(28, 19, sm((t - 9.2) / 2.8)), w_ride(t))
 
 SHOT = {
   "name": "scan_rays", "fps": FPS, "seconds": SECONDS,
@@ -141,12 +144,12 @@ SHOT = {
                     for t in TS]}}],
   "beats": [
     (0.0,  "high and far; flying in and down toward the hub as six rays search the floor"),
-    (3.0,  "arrives level with the hub and starts a slow half-circle to the right, facing it"),
-    (8.0,  "mid-orbit: the rays sweep past the lens, the hub stays centre frame"),
-    (12.75, "orbit ends opposite ray C (red), pointing away behind the hub; all rays start folding into it"),
-    (15.0, "one single beam; camera passes slowly right over the hub"),
-    (15.2, "a pulse of light runs out along the beam into the distance"),
-    (16.0, "camera flies straight ahead just above the beam"),
+    (1.4,  "still descending, the camera starts a slow arc to the right, always facing the hub"),
+    (5.0,  "ray C (red) stops searching and swings to point away behind the hub"),
+    (8.0,  "arc ends opposite ray C; all rays start folding into it"),
+    (10.25, "one single beam; camera passes slowly right over the hub"),
+    (10.4, "a pulse of light runs out along the beam into the distance"),
+    (11.0, "camera flies straight ahead just above the beam"),
   ],
 }
 
