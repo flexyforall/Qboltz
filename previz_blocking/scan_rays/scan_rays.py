@@ -156,11 +156,48 @@ SHOT = {
 _PULSE = _integrate(lambda t: (PULSE_V0 + (PULSE_V1 - PULSE_V0) * sm((t - PULSE_T0) / 2.0))
                     if t >= PULSE_T0 else 0.0)
 
+# ---------------------------------------------------------------- motes ----
+# deep space: no floor, a field of small round glowing motes drifting slowly.
+# A mote LIGHTS UP while a beam passes through it -- that is the "scanning".
+# They are also the only parallax the camera has now that the floor is gone.
+import random
+N_MOTES, MOTE_LIT_R, MOTE_CAM_CLEAR = 600, 1.0, 0.9
+
+def _ray_dist(p, i, t):
+    d = ray_dir(i, t); v = [p[k] - HUB[k] for k in range(3)]
+    u = sum(v[k] * d[k] for k in range(3))
+    if u < 0.0 or u > RAY_LEN: return 99.0
+    return math.dist(p, [HUB[k] + d[k] * u for k in range(3)])
+
+def motes():
+    rnd = random.Random(7)
+    cams = [cam_pos(f / FPS) for f in range(0, NF, 2)]
+    out = []
+    while len(out) < N_MOTES:
+        r = 1.2 + 30.0 * rnd.random() ** 1.6            # denser near the source
+        a = rnd.uniform(0, 2 * math.pi)
+        p0 = [HUB[0] + r * math.cos(a), HUB[1] + r * math.sin(a),
+              HUB[2] + rnd.uniform(-7.0, 9.0) * min(1.0, 0.35 + r / 12.0)]
+        sp = rnd.uniform(0.03, 0.14)                      # slow drift, m/s
+        th, ph = rnd.uniform(0, 2 * math.pi), rnd.uniform(-0.5, 0.5)
+        v = [sp * math.cos(ph) * math.cos(th), sp * math.cos(ph) * math.sin(th), sp * math.sin(ph)]
+        pos = lambda f: [p0[k] + v[k] * f / FPS for k in range(3)]
+        # never let a mote cross the lens
+        if any(math.dist(pos(2 * j), c) < MOTE_CAM_CLEAR for j, c in enumerate(cams)): continue
+        glow = []
+        for f in range(NF):
+            dmin = min(_ray_dist(pos(f), i, f / FPS) for i in range(len(RAYS)))
+            glow.append(round(1.0 - sm(dmin / MOTE_LIT_R), 3))
+        out.append({"p0": [round(x, 3) for x in p0], "v": [round(x, 4) for x in v],
+                    "r": round(rnd.uniform(0.03, 0.08), 3), "glow": glow})
+    return out
+
 if __name__ == "__main__":
     pulse_d = [round(_PULSE(f / FPS), 3) if f / FPS >= PULSE_T0 and _PULSE(f / FPS) < RAY_LEN
                else -1.0 for f in range(NF)]
     out = {"fps": FPS, "frames": NF, "hub": HUB, "length": RAY_LEN,
            "pulse": {"ray": "C", "d": pulse_d},
+           "motes": motes(),
            "rays": [{"name": r["name"], "color": r["color"],
                      # C is fatter and longer so the folded rays hide INSIDE it
                      # instead of z-fighting on shared faces
