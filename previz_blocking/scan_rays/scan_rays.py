@@ -161,7 +161,7 @@ _PULSE = _integrate(lambda t: (PULSE_V0 + (PULSE_V1 - PULSE_V0) * sm((t - PULSE_
 # A mote LIGHTS UP while a beam passes through it -- that is the "scanning".
 # They are also the only parallax the camera has now that the floor is gone.
 import random
-N_MOTES, MOTE_LIT_R, MOTE_CAM_CLEAR = 600, 1.0, 0.9
+N_MOTES, MOTE_LIT_R, MOTE_CAM_CLEAR = 1200, 1.0, 0.9
 
 def _ray_dist(p, i, t):
     d = ray_dir(i, t); v = [p[k] - HUB[k] for k in range(3)]
@@ -189,7 +189,7 @@ def motes():
             dmin = min(_ray_dist(pos(f), i, f / FPS) for i in range(len(RAYS)))
             glow.append(round(1.0 - sm(dmin / MOTE_LIT_R), 3))
         out.append({"p0": [round(x, 3) for x in p0], "v": [round(x, 4) for x in v],
-                    "r": round(rnd.uniform(0.03, 0.08), 3), "glow": glow})
+                    "r": round(rnd.uniform(0.010, 0.025), 4), "glow": glow})
     return out
 
 if __name__ == "__main__":
