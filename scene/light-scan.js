@@ -271,6 +271,39 @@ export function createLightScan(canvas) {
   const hubStar = makeStar(C.HUB);
   const dotStar = makeStar(C.DOT);
 
+  // background dots that a ray sweeps across: a plain dot that glints while the light plays on it
+  const catchGeo = new THREE.BufferGeometry();
+  catchGeo.setAttribute('position', new THREE.Float32BufferAttribute(C.CATCHES.flatMap((c) => [c.position.x, c.position.y, c.position.z]), 3));
+  const catchLit = new Float32Array(C.CATCHES.length);
+  catchGeo.setAttribute('aLit', new THREE.BufferAttribute(catchLit, 1));
+  const catches = new THREE.Points(catchGeo, additive({
+    vertexShader: /* glsl */`
+      attribute float aLit; varying float vLit; varying float vSize;
+      void main() {
+        vec4 mv = viewMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mv;
+        vLit = aLit;
+        vSize = 6.0 + 90.0 * aLit;
+        gl_PointSize = -mv.z > 0.05 ? vSize : 0.0;
+      }`,
+    fragmentShader: /* glsl */`
+      varying float vLit; varying float vSize;
+      void main() {
+        vec2 p = (gl_PointCoord - 0.5) * vSize;
+        float r = length(p);
+        float a = (0.35 + 2.5 * vLit) * exp(-r * r / 2.5) + 0.4 * vLit * exp(-r / (0.08 * vSize));
+        for (int k = 0; k < 2; k++) {                        // a small four-point glint
+          float th = 0.5 + float(k) * 1.5708;
+          vec2 e = vec2(cos(th), sin(th));
+          a += vLit * exp(-pow(dot(p, vec2(-e.y, e.x)), 2.0) / 1.2) * exp(-abs(dot(p, e)) / (0.18 * vSize));
+        }
+        a *= smoothstep(0.5 * vSize, 0.3 * vSize, r);
+        gl_FragColor = vec4(vec3(0.9, 0.93, 1.0) * a, 1.0);
+      }`,
+  }));
+  catches.frustumCulled = false;
+  scene.add(catches);
+
   // haze: a soft blue-violet volume fanning out along each ray, ray-marched at half size ------
   const hazeRT = new THREE.WebGLRenderTarget(W / 2, H / 2, { type: THREE.HalfFloatType });
   const quad = new THREE.PlaneGeometry(2, 2);
@@ -385,6 +418,8 @@ export function createLightScan(canvas) {
     hubStar.material.uniforms.uIntensity.value = st.hub.intensity;
     dotStar.material.uniforms.uSize.value = st.dot.size;
     dotStar.material.uniforms.uIntensity.value = st.dot.intensity;
+    st.catches.forEach((c, i) => { catchLit[i] = c.intensity; });
+    catchGeo.attributes.aLit.needsUpdate = true;
     grain.uniforms.uTime.value = t;
 
     vp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);

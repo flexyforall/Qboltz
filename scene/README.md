@@ -4,21 +4,21 @@ The intro animation, written in code instead of Blender. It renders in seconds p
 without a GPU, so motion changes can be checked quickly. It can also run live in the browser.
 
 **What happens (about 21 s, one continuous shot):**
-1. We start close on the hub as it ignites, and 5 rays grow out of it one after another.
-2. Staying close, the camera circles the hub and visits three rays. Each one passes by at close
-   range, sharp and prominent, while one or two others stay soft in the background.
+1. We are right at the root of the light: the hub ignites close in front of us, and 5 rays shoot out
+   of it, past the camera and off frame. Their ends are never seen.
+2. The camera floats around the hub at arm's length as the rays sweep. Now and then a ray falls on
+   a dot in the background, and the dot catches the light and glints for a moment.
 3. The rays swing together and merge into one, pointing at an ordinary dot that has been in the
-   field from the first frame. The camera moves in behind the hub.
-4. POV: the ray runs straight ahead of us and stretches into the distance until it lands on the
-   dot, which ignites.
+   field from the first frame. The camera slips in behind the hub.
+4. POV: the ray runs straight ahead of us and lands on the dot, which ignites.
 5. We travel along the ray, then drift out to the side and ease onto the hero frame: the dot at
    72% across and 33% down, its ray trailing left and fading. The shot holds.
 
 ## Files
 
 - `choreo.js`: the choreography, pure math with no rendering. It covers the camera route, the
-  speed, the aim, the depth of field, and the rays' sweeps, merge and stretch. Each visited ray is
-  phased so that it passes close by just as the camera arrives.
+  speed, the aim, the depth of field, and the rays' sweeps, merge and stretch. The glinting dots
+  (`CATCHES`) are placed exactly on a ray's path at a moment it is in frame.
 - `light-scan.js`: the WebGL renderer, built on three.js. It draws tiny dots on dotted orbital arcs,
   screen-space rays with crisp cores and glow, a ray-marched blue-violet haze, star glints, bloom
   and grain.

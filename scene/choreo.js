@@ -109,7 +109,7 @@ export const HUB = v3(0, 0, 0);
 export const U = v3(1, -0.25, 0.1).normalize();            // where the merged ray points
 export const DOT = U.clone().multiplyScalar(14);           // the answer: an ordinary dot
 const RIGHT = U.clone().cross(UP).normalize();             // camera-right while looking along U
-export const SEARCH_LEN = 9;                               // rays reach this far while searching
+export const SEARCH_LEN = 60;                              // long: their ends stay far out of frame
 
 //            yaw/s  wobble wob-f pitch-amp p-f   phase  strength core px glow px
 export const RAYS = [
@@ -179,53 +179,51 @@ const CF = DOT.clone().addScaledVector(TO_DOT, -11);      // final camera, besid
 const FINAL_LOOK = aim(TO_DOT, 0.72, 0.33);               // the dot lands exactly on the hero spot
 const orbit = (deg, r, z) => v3(r * Math.cos(deg * Math.PI / 180), r * Math.sin(deg * Math.PI / 180), z);
 
-// Close the whole time: the camera circles the hub at ~3.4 units, from the front round to behind
-// it, and visits three rays on the way. Each visited ray is phased so that, as the camera arrives,
-// it runs out past the camera at close range; the others stay in the background.
+// Right at the root of the light: the camera floats ~1.7 units from the hub and slowly circles
+// it, the rays shooting out past us and off frame. Then it slips in behind the hub for the POV.
 //                 waypoint                    speed (units/s)
-const ROUTE = [[orbit(-55, 3.6, 0.8), 0.3],               // close on the hub as it ignites
-  [orbit(-95, 3.4, 0.9), 0.75],                           // visit 1
-  [orbit(-130, 3.3, 0.6), 0.75],                          // visit 2
-  [orbit(-162, 3.2, 0.5), 0.75],                          // visit 3
-  [P0, 0.7],                                              // behind the hub, on the ray: POV
+const ROUTE = [[orbit(-50, 1.9, 0.35), 0.15],             // close on the hub as it ignites
+  [orbit(-85, 1.6, 0.5), 0.4],
+  [orbit(-125, 1.7, 0.25), 0.45],
+  [orbit(-160, 1.8, 0.4), 0.45],
+  [P0, 0.6],                                              // behind the hub, on the ray: POV
   [P0b, 0.6],
   [P1, 3.4],                                              // travelling along the ray
   [CF, 0.0]];                                             // eased to rest on the hero frame
 export const I_POV = 4;
-const VISIT_RAYS = [0, 1, 2];
 const R = makeRoute(ROUTE);
 const wpT = R.wpT;
 const camTrack = { at: R.at };
-const visitT = VISIT_RAYS.map((_, k) => wpT[1 + k]);
-for (const [k, ray] of VISIT_RAYS.entries()) {
-  const r = RAYS[ray];
-  const cam = camTrack.at(visitT[k]);
-  const c = cam.clone().sub(HUB).normalize();
-  // 35 deg off the line to the camera (it passes ~2 units from us), tilted alternately up and down
-  const axis = c.clone().cross(UP).normalize().applyAxisAngle(c, k % 2 ? 0.5 : -0.4);
-  const want = c.clone().applyAxisAngle(axis, 35 * Math.PI / 180);
-  r.y0 = 0; r.p0 = 0;
-  const [yf, pf] = freeAngles(r, visitT[k]);
-  r.y0 = Math.atan2(want.y, want.x) - yf;
-  r.p0 = Math.asin(want.z) - pf;
-}
 
 // key moments follow the camera, so retiming the route keeps the story in sync
 export const T_POV = wpT[I_POV];                          // camera is behind the hub
 const T_REST = wpT[wpT.length - 1];
 export const DURATION = T_REST + 1.8;
-
-// the merge starts once the last visit has had its time, and the stretch follows it
-const T_MERGE0 = visitT[visitT.length - 1] + 1.3, T_MERGE1 = T_MERGE0 + 1.6;
+const T_MERGE0 = T_POV - 0.6, T_MERGE1 = T_MERGE0 + 1.6;
 const T_STRETCH = T_MERGE1;
 
-// each visit is centred on the camera reaching that ray's waypoint
-const VISITS = VISIT_RAYS.map((ray, k) => {
-  const tm = visitT[k];
-  const before = k === 0 ? 1.6 : (tm - visitT[k - 1]) / 2;
-  const after = k === VISIT_RAYS.length - 1 ? T_MERGE0 - tm : (visitT[k + 1] - tm) / 2;
-  return { ray, t0: tm - before, t1: tm + after };
-});
+// Background dots that a ray sweeps across while we watch: placed exactly on a ray's path at a
+// moment it is in frame, so each one catches the light and glints for a moment.
+const freeDir = (i, t) => fromAngles(...freeAngles(RAYS[i], t));
+export const CATCHES = (() => {
+  const out = [];
+  let seed = 7;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  RAYS.forEach((_, i) => {
+    let last = -9;
+    for (let t = 2.4 + 0.37 * i; t < T_MERGE0 - 0.5; t += 0.2) {
+      if (t - last < 1.8) continue;
+      const p = HUB.clone().addScaledVector(freeDir(i, t), 1.3 + rnd() * 6);
+      const cam = camTrack.at(t);
+      const q = toScreen(cam, HUB.clone().sub(cam), p);
+      if (q.z > 0.8 && q.x > 0.06 && q.x < 0.94 && q.y > 0.08 && q.y < 0.92) {
+        out.push({ position: p, ray: i, t });
+        last = t;
+      }
+    }
+  });
+  return out;
+})();
 
 // rays are one-sided (they leave the hub), and all swing round to point at the dot
 export function rayDir(i, t) {
@@ -244,13 +242,6 @@ function rayState(i, t) {
   const flicker = r.str > 0.5 ? 1 : 0.85 + 0.15 * Math.sin(7.3 * t + r.ph) * Math.sin(3.1 * t);
   let k = r.str * flicker * ramp(t, start, start + 0.15, 0, 1);
   k *= i === WIN ? 1 + 0.2 * merge : 1 - 0.85 * merge;      // merged: one strong ray, not a blown-out sum
-  // while the camera features a ray, the others step back (still in frame, just not prominent)
-  let featured = 0, visitW = 0;
-  VISITS.forEach((v) => {
-    const w = smooth((t - (v.t0 - 0.4)) / 0.8) - smooth((t - (v.t1 - 0.4)) / 0.8);
-    visitW += w; if (v.ray === i) featured += w;
-  });
-  k *= 1 - 0.5 * clamp01(visitW) * (1 - featured);
   return {
     dir: rayDir(i, t),
     lenPos: Math.max(toDot, 0.01), lenNeg: 0.01,           // after the merge they all stretch together
@@ -261,24 +252,21 @@ function rayState(i, t) {
   };
 }
 
-// camera aim: hub first, then each featured ray (a point along it, following its sweep),
-// then the dot; finally it eases onto the hero framing. Smoothed over time afterwards.
-function aimTargets(t) {
-  const tIn = VISITS[0].t0;
-  const list = [{ w: 1 - smooth((t - (tIn - 0.4)) / 0.8), p: HUB.clone() }];
-  VISITS.forEach((v, n) => {
-    const wIn = smooth((t - (v.t0 - 0.7)) / 1.4);
-    const wOut = n === VISITS.length - 1 ? smooth((t - (T_MERGE0 - 0.4)) / 0.8) : smooth((t - (v.t1 - 0.7)) / 1.4);
-    list.push({ w: wIn - wOut, p: HUB.clone().addScaledVector(rayDir(v.ray, t), 2.4) });   // along it, hub at the edge
-  });
-  list.push({ w: smooth((t - (T_MERGE0 - 0.4)) / 0.8), p: DOT.clone() });
-  return list;
+// camera aim: the hub, floating a little off centre so the rays sweep through the frame; then
+// the dot; finally it eases onto the hero framing. Smoothed over time afterwards.
+function aimTargets(t, cam) {
+  const view = HUB.clone().sub(cam).normalize();
+  const side = view.clone().cross(UP).normalize();
+  const up = side.clone().cross(view);
+  const drift = side.multiplyScalar(0.28 * Math.sin(0.31 * t + 0.4)).addScaledVector(up, 0.18 * Math.sin(0.23 * t + 1.1));
+  const toDot = smooth((t - (T_MERGE0 - 0.4)) / 0.8);
+  return [{ w: 1 - toDot, p: HUB.clone().add(drift) }, { w: toDot, p: DOT.clone() }];
 }
 
 function rawLook(t, cam) {
   const dir = v3(0, 0, 0);
   let focus = 0;
-  for (const { w, p } of aimTargets(t)) {
+  for (const { w, p } of aimTargets(t, cam)) {
     if (w <= 1e-6) continue;
     dir.addScaledVector(p.clone().sub(cam).normalize(), w);
     focus += w * p.distanceTo(cam);
@@ -314,6 +302,24 @@ function sampleFrames(arr, t, lerpFn) {
   return lerpFn(arr[i], arr[j], k);
 }
 
+// how strongly the rays light a point right now, with a short afterglow (the light plays on it)
+function catchLight(p, t) {
+  let best = 0;
+  for (const tau of [0, 0.1, 0.2, 0.32, 0.45, 0.6]) {
+    let lit = 0;
+    RAYS.forEach((_, i) => {
+      const r = rayState(i, t - tau);
+      const v = p.clone().sub(HUB);
+      const along = v.dot(r.dir);
+      if (along <= 0 || along > r.lenPos) return;
+      const d = v.addScaledVector(r.dir, -along).length();
+      lit += r.intensity * Math.exp(-(d * d) / (0.06 * 0.06 + 0.0004 * along * along));
+    });
+    best = Math.max(best, lit * Math.exp(-tau / 0.3));
+  }
+  return Math.min(best, 1.5);
+}
+
 // everything the renderer needs at time t
 export function stateAt(t) {
   const cam = sampleFrames(camAt, t, (a, b, k) => a.clone().lerp(b, k));
@@ -323,13 +329,14 @@ export function stateAt(t) {
     t,
     camera: { position: cam, target: cam.clone().add(look), focus,
       // shallow depth of field while visiting rays (the others soften), deeper at the end
-      coc: ramp(t, 1.0, 2.5, 30, 45) - ramp(t, T_MERGE0, T_STRETCH + 1, 0, 20) },
+      coc: 18 + ramp(t, T_MERGE0, T_STRETCH + 1, 0, 7) },
     hub: {
       position: HUB,
       intensity: ramp(t, 0.0, 0.25, 0, 3.2) - ramp(t, 0.25, 1.2, 0, 1.8),
       size: ramp(t, 0.0, 0.25, 0, 260) - ramp(t, 0.25, 1.2, 0, 120),
     },
     rays: RAYS.map((_, i) => rayState(i, t)),
+    catches: CATCHES.map((c) => ({ position: c.position, intensity: catchLight(c.position, t) })),
     dot: {     // an ordinary dot until the ray lands on it
       position: DOT,
       intensity: 0.25 + ramp(t, T_STRETCH + 1.2, T_STRETCH + 1.8, 0, 2.2),
@@ -339,4 +346,4 @@ export function stateAt(t) {
 }
 
 // for checks
-export const debug = { camAt, looks, focusAt, CF, FINAL_LOOK, DOT, HUB, N_FRAMES, wpT, VISITS };
+export const debug = { camAt, looks, focusAt, CF, FINAL_LOOK, DOT, HUB, N_FRAMES, wpT, CATCHES };
