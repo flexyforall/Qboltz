@@ -61,4 +61,6 @@ blk.hide_set(True)
 print(PV.viewport_ready())
 ''' % (core, bake, rays)
 open(os.path.join(H, "build_scan_rays.py"), "w").write(out)
+# live.py is what live_link.py in Blender watches: the current pass, always
+open(os.path.join(os.path.dirname(H), "live.py"), "w").write(out)
 print("build ->", os.path.join(H, "build_scan_rays.py"), "%.0f KB" % (len(out) / 1024))
