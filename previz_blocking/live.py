@@ -18,9 +18,11 @@ R = json.loads(RAYS)
 
 PV.wipe()
 PV.reset(fps=R["fps"], seconds=R["frames"] / R["fps"])
-# deep space: no floor, no sun -- a near-black world and a field of motes
-bpy.context.scene.world.color = (0.008, 0.010, 0.030)   # what SOLID / Workbench shows
-bpy.context.scene.view_settings.view_transform = 'Standard'  # flat colours read true, no AgX wash
+# deep space: no floor, no sun, just a field of motes. The LOOK stays plain
+# greybox (studio-lit solid, Blender's default grey world and AgX) so it reads
+# as a blocking pass, not a styled render.
+bpy.context.scene.world.color = (0.050876, 0.050876, 0.050876)
+bpy.context.scene.view_settings.view_transform = 'AgX'
 
 # no hub object: the rays leave from one bare point in the air -- a block there
 # would hand the video model an object nobody wants in the shot
@@ -100,7 +102,7 @@ blk.hide_set(True)
 
 print(PV.viewport_ready())
 ds = bpy.context.scene.display.shading                # what PV.motion_render() uses
-ds.light, ds.color_type = 'FLAT', 'OBJECT'
+ds.light, ds.color_type = 'STUDIO', 'OBJECT'
 
 # fill every 3D view with the camera frame (View -> Frame Camera Bounds)
 for w in bpy.context.window_manager.windows:
@@ -108,7 +110,9 @@ for w in bpy.context.window_manager.windows:
         if a.type != 'VIEW_3D': continue
         a.spaces.active.show_gizmo = True     # keep the camera / zoom / pan buttons on the right
         sh = a.spaces.active.shading
-        sh.light, sh.color_type, sh.background_type = 'FLAT', 'OBJECT', 'WORLD'
+        # studio-lit solid like every earlier pass; OBJECT colour only so a
+        # mote can flash orange on its own (rays carry their palette colour)
+        sh.light, sh.color_type, sh.background_type = 'STUDIO', 'OBJECT', 'THEME'
         rg = next((r for r in a.regions if r.type == 'WINDOW'), None)
         try:
             with bpy.context.temp_override(window=w, screen=w.screen, area=a, region=rg):
