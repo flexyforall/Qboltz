@@ -15,7 +15,7 @@ FPS, SECONDS = 24, 13.0
 NF = int(round(FPS * SECONDS))
 HUB = (0.0, 0.0, 0.0)                 # the source, floating in space
 RAY_LEN = 150.0                       # slab length; drawn shorter via scale
-SCAN_LEN = 16.0                       # rays reach this far while searching
+SCAN_LEN = 20.0                       # rays reach this far while searching (tapered: no hard end)
 
 def sm(x):
     x = max(0.0, min(1.0, x)); return x * x * x * (x * (6 * x - 15) + 10)
@@ -192,7 +192,10 @@ def motes():
 if __name__ == "__main__":
     out = {"fps": FPS, "frames": NF, "hub": HUB, "length": RAY_LEN, "mote_motion": "swirl",
            "rays": [{"name": r["name"], "color": r["color"],
-                     "width": 0.16 if r["name"] == "C" else 0.12,
+                     # TAPERED to a point so a ray fades out instead of ending in a
+                     # cut face; all one width so the hero never reads as "stronger"
+                     "taper": True,
+                     "width": 0.10 if r["name"] == "C" else 0.09,
                      "length": RAY_LEN,
                      "az": [round(ray_angles(i, f / FPS)[0], 5) for f in range(NF)],
                      "el": [round(ray_angles(i, f / FPS)[1], 5) for f in range(NF)],

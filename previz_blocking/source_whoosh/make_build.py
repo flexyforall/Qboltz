@@ -51,9 +51,24 @@ hx, hy, hz = R["hub"]
 # six rays: long thin emissive slabs pivoting on the hub, base on the pivot,
 # local +Z aimed at (az, el) -> euler XYZ = (pi/2 - el, 0, az + pi/2)
 for r in R["rays"]:
-    o = PV.slab("SET_ray_" + r["name"], (r.get("width", 0.10), r.get("width", 0.10),
-                r.get("length", R["length"])), (hx, hy, hz),
-                r["color"], emit=6.0, base=True)
+    if r.get("taper"):
+        # a thin pyramid: square base on the source, apex at the far end -- the ray
+        # narrows to nothing instead of stopping on a cut face
+        nm = "SET_ray_" + r["name"]
+        old = bpy.data.objects.get(nm)
+        if old: bpy.data.objects.remove(old, do_unlink=True)
+        hw, L = r.get("width", 0.10) / 2, r.get("length", R["length"])
+        me_r = bpy.data.meshes.new(nm + "_m")
+        me_r.from_pydata([(-hw, -hw, 0), (hw, -hw, 0), (hw, hw, 0), (-hw, hw, 0), (0, 0, L)], [],
+                         [(0, 3, 2, 1), (0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)])
+        me_r.update()
+        o = bpy.data.objects.new(nm, me_r); PV.coll("SET").objects.link(o)
+        o.location = (hx, hy, hz)
+        o.data.materials.append(PV._matfor(r["color"], emit=6.0))
+    else:
+        o = PV.slab("SET_ray_" + r["name"], (r.get("width", 0.10), r.get("width", 0.10),
+                    r.get("length", R["length"])), (hx, hy, hz),
+                    r["color"], emit=6.0, base=True)
     o.color = (*PV.PALETTE[r["color"]], 1.0)
     o.rotation_mode = 'XYZ'
     ch = {("rotation_euler", 0): [math.pi / 2 - e for e in r["el"]],
