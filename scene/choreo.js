@@ -121,119 +121,126 @@ export const RAYS = [
 ];
 const WIN = 0;                                             // the others merge into this one
 
-// camera route ----------------------------------------------------------------------
-// The path (where the camera goes) and the timing (how fast) are separate: positions come from a
-// smooth curve through the waypoints, re-parameterised by arc length; each waypoint gets a speed
-// and each stretch lasts exactly as long as a straight speed ramp needs, so speed never bulges.
-const orbit = (deg, r, z) => v3(r * Math.cos(deg * Math.PI / 180), r * Math.sin(deg * Math.PI / 180), z);
-const P0 = HUB.clone().addScaledVector(U, -3.2).addScaledVector(UP, 0.4).addScaledVector(RIGHT, 0.6);
-const P0b = P0.clone().addScaledVector(U, 1.2);
-const P1 = HUB.clone().addScaledVector(U, 2.8).addScaledVector(UP, 0.5).addScaledVector(RIGHT, 1.0);
-const TO_DOT = U.clone().applyQuaternion(new Quaternion().setFromAxisAngle(UP, 25 * Math.PI / 180))
-  .add(v3(0, 0, -0.04)).normalize();
-const CF = DOT.clone().addScaledVector(TO_DOT, -11);      // final camera, beside the ray
-const FINAL_LOOK = aim(TO_DOT, 0.72, 0.33);               // the dot lands exactly on the hero spot
-
-//                 waypoint                  speed (units/s)
-const ROUTE = [[orbit(-108, 9.6, 1.4), 0.3],             // wide, the hub dead centre
-  [orbit(-130, 9.4, 1.8), 1.6],
-  [orbit(-152, 9.0, 1.1), 1.8],
-  [orbit(-172, 8.4, 0.7), 1.7],
-  [P0, 1.1],                                              // behind the hub, on the ray: POV
-  [P0b, 1.0],
-  [P1, 3.6],                                              // travelling along the ray
-  [CF, 0.0]];                                             // eased to rest on the hero frame
-const I_POV = 4;
-
-const chord = [0];
-for (let i = 1; i < ROUTE.length; i++) chord.push(chord[i - 1] + ROUTE[i][0].distanceTo(ROUTE[i - 1][0]));
-const geo = new Track(ROUTE.map(([p], i) => [chord[i], p]));
-const N_ARC = 4000;
-const arcC = [], arcS = [0];
-for (let k = 0; k <= N_ARC; k++) arcC.push(chord[chord.length - 1] * k / N_ARC);
-for (let k = 1; k <= N_ARC; k++) arcS.push(arcS[k - 1] + geo.at(arcC[k]).distanceTo(geo.at(arcC[k - 1])));
-const sOfC = (c) => {
-  const x = c / chord[chord.length - 1] * N_ARC, k = Math.min(Math.floor(x), N_ARC - 1);
-  return arcS[k] + (arcS[k + 1] - arcS[k]) * (x - k);
-};
-const cOfS = (s) => {
-  let lo = 0, hi = N_ARC;
-  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (arcS[m] <= s) lo = m; else hi = m; }
-  const k = (s - arcS[lo]) / Math.max(arcS[hi] - arcS[lo], 1e-9);
-  return arcC[lo] + k * (arcC[hi] - arcC[lo]);
-};
-const wpS = chord.map(sOfC);
-const wpT = [0];
-for (let i = 1; i < ROUTE.length; i++) {
-  const v0 = ROUTE[i - 1][1], v1 = ROUTE[i][1];
-  // the final stretch is a pure ease-out (v0 * (1 - x)^2 covers v0 * h / 3): no jolt at rest
-  const h = v1 === 0 ? 3 * (wpS[i] - wpS[i - 1]) / v0 : 2 * (wpS[i] - wpS[i - 1]) / (v0 + v1);
-  wpT.push(wpT[i - 1] + h);
-}
-function distAt(t) {
-  if (t >= wpT[wpT.length - 1]) return wpS[wpS.length - 1];
-  let i = 0;
-  while (wpT[i + 1] <= t) i++;
-  const h = wpT[i + 1] - wpT[i], x = (t - wpT[i]) / h, v0 = ROUTE[i][1], v1 = ROUTE[i + 1][1];
-  return (2 * x ** 3 - 3 * x ** 2 + 1) * wpS[i] + (x ** 3 - 2 * x ** 2 + x) * h * v0
-    + (-2 * x ** 3 + 3 * x ** 2) * wpS[i + 1] + (x ** 3 - x ** 2) * h * v1;
-}
-const camTrack = { at: (t) => geo.at(cOfS(distAt(t))) };
-
-// key moments follow the camera, so retiming the route keeps the story in sync
-export const T_POV = wpT[I_POV];                          // camera is behind the hub
-const T_REST = wpT[wpT.length - 1];
-export const DURATION = T_REST + 1.8;
-
-// which ray the camera features, when, and at what angle it should be seen
-const T_VISITS = 2.6;
-const VISIT_LEN = (T_POV - 1.6 - T_VISITS) / 3;           // three visits fill the time until the merge
-const VISITS = [[0, 0.45], [1, -0.5], [2, 0.3]].map(([ray, tilt], n) => (
-  { ray, tilt, t0: T_VISITS + n * VISIT_LEN, t1: T_VISITS + (n + 1) * VISIT_LEN }));
-
 function freeAngles(r, t) {
   return [r.y0 + r.ys * t + r.wob * Math.sin(r.wf * t + r.ph), r.p0 + r.pa * Math.sin(r.pf * t + r.ph)];
 }
 function fromAngles(yaw, pitch) {
   return v3(Math.cos(pitch) * Math.cos(yaw), Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch));
 }
+RAYS.forEach((r, i) => { r.y0 = i * 2.4 + 0.6; r.p0 = 0.15 * Math.sin(i * 1.7); });  // spread around the hub
 
-// Phase each featured ray so that, mid-visit, it lies across the view (not end-on) at the
-// visit's tilt; the others are spread around evenly.
-RAYS.forEach((r, i) => { r.y0 = i * 2.4; r.p0 = 0; });
-for (const v of VISITS) {
-  const r = RAYS[v.ray];
-  const tm = (v.t0 + v.t1) / 2;
-  const view = HUB.clone().sub(camTrack.at(tm)).normalize();
-  const across = view.clone().cross(UP).normalize();
-  const want = across.applyAxisAngle(view, v.tilt);
-  r.y0 = 0; r.p0 = 0;
-  const [yf, pf] = freeAngles(r, tm);
-  r.y0 = Math.atan2(want.y, want.x) - yf;
-  r.p0 = Math.asin(want.z) - pf;
-  v.side = Math.sign(want.dot(camTrack.at(tm).sub(HUB))) || 1;  // the half facing the camera
+// camera route ----------------------------------------------------------------------
+// The path (where the camera goes) and the timing (how fast) are separate: positions come from a
+// smooth curve through the waypoints, re-parameterised by arc length; each waypoint gets a speed
+// and each stretch lasts exactly as long as a straight speed ramp needs, so speed never bulges.
+function makeRoute(route) {
+  const chord = [0];
+  for (let i = 1; i < route.length; i++) chord.push(chord[i - 1] + route[i][0].distanceTo(route[i - 1][0]));
+  const geo = new Track(route.map(([p], i) => [chord[i], p]));
+  const N_ARC = 4000, total = chord[chord.length - 1];
+  const arcC = [], arcS = [0];
+  for (let k = 0; k <= N_ARC; k++) arcC.push(total * k / N_ARC);
+  for (let k = 1; k <= N_ARC; k++) arcS.push(arcS[k - 1] + geo.at(arcC[k]).distanceTo(geo.at(arcC[k - 1])));
+  const sOfC = (c) => {
+    const x = c / total * N_ARC, k = Math.min(Math.floor(x), N_ARC - 1);
+    return arcS[k] + (arcS[k + 1] - arcS[k]) * (x - k);
+  };
+  const cOfS = (s) => {
+    let lo = 0, hi = N_ARC;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (arcS[m] <= s) lo = m; else hi = m; }
+    const k = (s - arcS[lo]) / Math.max(arcS[hi] - arcS[lo], 1e-9);
+    return arcC[lo] + k * (arcC[hi] - arcC[lo]);
+  };
+  const wpS = chord.map(sOfC);
+  const wpT = [0];
+  for (let i = 1; i < route.length; i++) {
+    const v0 = route[i - 1][1], v1 = route[i][1];
+    // the final stretch is a pure ease-out (v0 * (1 - x)^2 covers v0 * h / 3): no jolt at rest
+    const h = v1 === 0 ? 3 * (wpS[i] - wpS[i - 1]) / v0 : 2 * (wpS[i] - wpS[i - 1]) / (v0 + v1);
+    wpT.push(wpT[i - 1] + h);
+  }
+  const distAt = (t) => {
+    if (t >= wpT[wpT.length - 1]) return wpS[wpS.length - 1];
+    let i = 0;
+    while (wpT[i + 1] <= t) i++;
+    const h = wpT[i + 1] - wpT[i], x = (t - wpT[i]) / h, v0 = route[i][1], v1 = route[i + 1][1];
+    return (2 * x ** 3 - 3 * x ** 2 + 1) * wpS[i] + (x ** 3 - 2 * x ** 2 + x) * h * v0
+      + (-2 * x ** 3 + 3 * x ** 2) * wpS[i + 1] + (x ** 3 - x ** 2) * h * v1;
+  };
+  return { wpT, at: (t) => geo.at(cOfS(distAt(t))) };
 }
 
-const T_MERGE0 = T_POV - 1.6, T_MERGE1 = T_POV;
-// which way along U each ray's +direction ends up, so the stretch happens on the right half
-const MERGE_SIGN = RAYS.map((r) => Math.sign(fromAngles(...freeAngles(r, T_MERGE0)).dot(U)) || 1);
+const P0 = HUB.clone().addScaledVector(U, -2.4).addScaledVector(UP, 0.35).addScaledVector(RIGHT, 0.5);
+const P0b = P0.clone().addScaledVector(U, 1.3);
+const P1 = HUB.clone().addScaledVector(U, 2.8).addScaledVector(UP, 0.5).addScaledVector(RIGHT, 1.0);
+const TO_DOT = U.clone().applyQuaternion(new Quaternion().setFromAxisAngle(UP, 25 * Math.PI / 180))
+  .add(v3(0, 0, -0.04)).normalize();
+const CF = DOT.clone().addScaledVector(TO_DOT, -11);      // final camera, beside the ray
+const FINAL_LOOK = aim(TO_DOT, 0.72, 0.33);               // the dot lands exactly on the hero spot
+const orbit = (deg, r, z) => v3(r * Math.cos(deg * Math.PI / 180), r * Math.sin(deg * Math.PI / 180), z);
 
+// Close the whole time: the camera circles the hub at ~3.4 units, from the front round to behind
+// it, and visits three rays on the way. Each visited ray is phased so that, as the camera arrives,
+// it runs out past the camera at close range; the others stay in the background.
+//                 waypoint                    speed (units/s)
+const ROUTE = [[orbit(-55, 3.6, 0.8), 0.3],               // close on the hub as it ignites
+  [orbit(-95, 3.4, 0.9), 0.75],                           // visit 1
+  [orbit(-130, 3.3, 0.6), 0.75],                          // visit 2
+  [orbit(-162, 3.2, 0.5), 0.75],                          // visit 3
+  [P0, 0.7],                                              // behind the hub, on the ray: POV
+  [P0b, 0.6],
+  [P1, 3.4],                                              // travelling along the ray
+  [CF, 0.0]];                                             // eased to rest on the hero frame
+export const I_POV = 4;
+const VISIT_RAYS = [0, 1, 2];
+const R = makeRoute(ROUTE);
+const wpT = R.wpT;
+const camTrack = { at: R.at };
+const visitT = VISIT_RAYS.map((_, k) => wpT[1 + k]);
+for (const [k, ray] of VISIT_RAYS.entries()) {
+  const r = RAYS[ray];
+  const cam = camTrack.at(visitT[k]);
+  const c = cam.clone().sub(HUB).normalize();
+  // 35 deg off the line to the camera (it passes ~2 units from us), tilted alternately up and down
+  const axis = c.clone().cross(UP).normalize().applyAxisAngle(c, k % 2 ? 0.5 : -0.4);
+  const want = c.clone().applyAxisAngle(axis, 35 * Math.PI / 180);
+  r.y0 = 0; r.p0 = 0;
+  const [yf, pf] = freeAngles(r, visitT[k]);
+  r.y0 = Math.atan2(want.y, want.x) - yf;
+  r.p0 = Math.asin(want.z) - pf;
+}
+
+// key moments follow the camera, so retiming the route keeps the story in sync
+export const T_POV = wpT[I_POV];                          // camera is behind the hub
+const T_REST = wpT[wpT.length - 1];
+export const DURATION = T_REST + 1.8;
+
+// the merge starts once the last visit has had its time, and the stretch follows it
+const T_MERGE0 = visitT[visitT.length - 1] + 1.3, T_MERGE1 = T_MERGE0 + 1.6;
+const T_STRETCH = T_MERGE1;
+
+// each visit is centred on the camera reaching that ray's waypoint
+const VISITS = VISIT_RAYS.map((ray, k) => {
+  const tm = visitT[k];
+  const before = k === 0 ? 1.6 : (tm - visitT[k - 1]) / 2;
+  const after = k === VISIT_RAYS.length - 1 ? T_MERGE0 - tm : (visitT[k + 1] - tm) / 2;
+  return { ray, t0: tm - before, t1: tm + after };
+});
+
+// rays are one-sided (they leave the hub), and all swing round to point at the dot
 export function rayDir(i, t) {
   const d = fromAngles(...freeAngles(RAYS[i], t));
-  return slerpVec(d, U.clone().multiplyScalar(MERGE_SIGN[i]), smoother((t - T_MERGE0) / (T_MERGE1 - T_MERGE0)));
+  return slerpVec(d, U, smoother((t - T_MERGE0) / (T_MERGE1 - T_MERGE0)));
 }
 
 function rayState(i, t) {
   const r = RAYS[i];
   const start = 0.5 + 0.35 * i;                              // rays leave the hub one by one
   const grow = SEARCH_LEN * smooth((t - start) / 1.8) ** 1.2;
-  const stretch = smoother((t - T_POV) / 1.4);               // reaches out to the dot in POV
+  const stretch = smoother((t - T_STRETCH) / 1.4);           // reaches out to the dot in POV
   const toDot = grow + (DOT.length() - grow) * stretch;
   const merge = smoother((t - T_MERGE0) / (T_MERGE1 - T_MERGE0));
-  // after the merge every ray lies on the same line, so they all stretch together
-  const fwd = MERGE_SIGN[i] > 0 ? toDot : grow;
-  const back = MERGE_SIGN[i] > 0 ? grow : toDot;
-  const crisp = 0.92 * smoother((t - T_POV - 0.6) / 0.8);    // the end turns sharp: it lands
+  const crisp = 0.92 * smoother((t - T_STRETCH - 0.6) / 0.8); // the end turns sharp: it lands
   const flicker = r.str > 0.5 ? 1 : 0.85 + 0.15 * Math.sin(7.3 * t + r.ph) * Math.sin(3.1 * t);
   let k = r.str * flicker * ramp(t, start, start + 0.15, 0, 1);
   k *= i === WIN ? 1 + 0.2 * merge : 1 - 0.85 * merge;      // merged: one strong ray, not a blown-out sum
@@ -246,8 +253,8 @@ function rayState(i, t) {
   k *= 1 - 0.5 * clamp01(visitW) * (1 - featured);
   return {
     dir: rayDir(i, t),
-    lenPos: Math.max(fwd, 0.01), lenNeg: Math.max(back, 0.01),
-    crispPos: MERGE_SIGN[i] > 0 ? crisp : 0, crispNeg: MERGE_SIGN[i] > 0 ? 0 : crisp,
+    lenPos: Math.max(toDot, 0.01), lenNeg: 0.01,           // after the merge they all stretch together
+    crispPos: crisp, crispNeg: 0,
     intensity: k, core: r.core, glow: r.glow,
     haze: k * (i === WIN ? 1 : 1 - merge),                   // merged: one haze fan, not five stacked
     taper: 0.85 * smoother((t - wpT[I_POV + 2]) / 2.5),      // leaving the ray: its tail fades towards the hub
@@ -257,11 +264,12 @@ function rayState(i, t) {
 // camera aim: hub first, then each featured ray (a point along it, following its sweep),
 // then the dot; finally it eases onto the hero framing. Smoothed over time afterwards.
 function aimTargets(t) {
-  const list = [{ w: 1 - smooth((t - 2.2) / 0.8), p: HUB.clone() }];
+  const tIn = VISITS[0].t0;
+  const list = [{ w: 1 - smooth((t - (tIn - 0.4)) / 0.8), p: HUB.clone() }];
   VISITS.forEach((v, n) => {
-    const wIn = n === 0 ? smooth((t - 2.2) / 0.8) : smooth((t - (v.t0 - 0.4)) / 0.8);
-    const wOut = n === VISITS.length - 1 ? smooth((t - (T_MERGE0 - 0.4)) / 0.8) : smooth((t - (v.t1 - 0.4)) / 0.8);
-    list.push({ w: wIn - wOut, p: HUB.clone().addScaledVector(rayDir(v.ray, t), 1.8 * v.side) });
+    const wIn = smooth((t - (v.t0 - 0.7)) / 1.4);
+    const wOut = n === VISITS.length - 1 ? smooth((t - (T_MERGE0 - 0.4)) / 0.8) : smooth((t - (v.t1 - 0.7)) / 1.4);
+    list.push({ w: wIn - wOut, p: HUB.clone().addScaledVector(rayDir(v.ray, t), 2.4) });   // along it, hub at the edge
   });
   list.push({ w: smooth((t - (T_MERGE0 - 0.4)) / 0.8), p: DOT.clone() });
   return list;
@@ -281,7 +289,7 @@ function rawLook(t, cam) {
   return { look: slerpVec(dir, FINAL_LOOK, k), focus: focus * (1 - k) + DOT.distanceTo(CF) * k };
 }
 
-// precompute camera per frame, with the aim smoothed over ~0.3 s so nothing jerks
+// precompute camera per frame, with the aim smoothed over ~0.45 s so nothing jerks
 const N_FRAMES = Math.round(DURATION * FPS) + 1;
 const camAt = [], focusAt = [], rawLooks = [];
 for (let f = 0; f < N_FRAMES; f++) {
@@ -290,7 +298,7 @@ for (let f = 0; f < N_FRAMES; f++) {
   const { look, focus } = rawLook(t, c);
   camAt.push(c); rawLooks.push(look); focusAt.push(focus);
 }
-const SIGMA = 0.3 * FPS;
+const SIGMA = 0.45 * FPS;
 const looks = rawLooks.map((_, i) => {
   const acc = v3(0, 0, 0);
   for (let j = -Math.ceil(3 * SIGMA); j <= Math.ceil(3 * SIGMA); j++) {
@@ -315,24 +323,20 @@ export function stateAt(t) {
     t,
     camera: { position: cam, target: cam.clone().add(look), focus,
       // shallow depth of field while visiting rays (the others soften), deeper at the end
-      coc: ramp(t, 2.0, 3.0, 40, 70) - ramp(t, T_MERGE0, T_POV + 1, 0, 35) },
+      coc: ramp(t, 1.0, 2.5, 30, 45) - ramp(t, T_MERGE0, T_STRETCH + 1, 0, 20) },
     hub: {
       position: HUB,
       intensity: ramp(t, 0.0, 0.25, 0, 3.2) - ramp(t, 0.25, 1.2, 0, 1.8),
       size: ramp(t, 0.0, 0.25, 0, 260) - ramp(t, 0.25, 1.2, 0, 120),
     },
-    burst: {   // fine radial streaks when the hub ignites
-      length: 7 * smooth((t - 0.1) / 1.0) ** 0.7,
-      alpha: ramp(t, 0.1, 0.35, 0, 1) - ramp(t, 0.6, 1.9, 0, 1),
-    },
     rays: RAYS.map((_, i) => rayState(i, t)),
     dot: {     // an ordinary dot until the ray lands on it
       position: DOT,
-      intensity: 0.25 + ramp(t, T_POV + 1.2, T_POV + 1.8, 0, 2.2),
-      size: 6 + ramp(t, T_POV + 1.2, T_POV + 1.8, 0, 190),
+      intensity: 0.25 + ramp(t, T_STRETCH + 1.2, T_STRETCH + 1.8, 0, 2.2),
+      size: 6 + ramp(t, T_STRETCH + 1.2, T_STRETCH + 1.8, 0, 190),
     },
   };
 }
 
 // for checks
-export const debug = { camAt, looks, focusAt, CF, FINAL_LOOK, DOT, HUB, N_FRAMES, wpT };
+export const debug = { camAt, looks, focusAt, CF, FINAL_LOOK, DOT, HUB, N_FRAMES, wpT, VISITS };

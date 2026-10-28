@@ -30,7 +30,7 @@ function mulberry32(seed) {
 }
 
 // screen-space ribbon: a line of constant pixel width (crisp core + soft glow) whose width
-// grows and dims with defocus. Shared by the rays and the ignition burst.
+// grows and dims with defocus.
 const RIBBON_VERT_COMMON = /* glsl */`
   uniform vec2 uRes;
   uniform float uCocK, uFocus;
@@ -232,46 +232,6 @@ export function createLightScan(canvas) {
     return m;
   });
 
-  // ignition burst: many fine radial streaks -------------------------------------------------
-  const BURST = 160, BSEG = 10;
-  const bGeo = (() => {
-    const s = [], side = [], dir = [], rnd = [], idx = [];
-    const r2 = mulberry32(5);
-    for (let l = 0; l < BURST; l++) {
-      const d = new THREE.Vector3(r2() - 0.5, r2() - 0.5, r2() - 0.5).normalize();
-      const rr = r2();
-      const base = l * (BSEG + 1) * 2;
-      for (let i = 0; i <= BSEG; i++) {
-        s.push(i / BSEG, i / BSEG); side.push(-1, 1);
-        dir.push(d.x, d.y, d.z, d.x, d.y, d.z); rnd.push(rr, rr);
-        if (i < BSEG) { const a = base + 2 * i; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
-      }
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(new Array(s.length * 3).fill(0), 3));
-    g.setAttribute('aS', new THREE.Float32BufferAttribute(s, 1));
-    g.setAttribute('aSide', new THREE.Float32BufferAttribute(side, 1));
-    g.setAttribute('aDir', new THREE.Float32BufferAttribute(dir, 3));
-    g.setAttribute('aRnd', new THREE.Float32BufferAttribute(rnd, 1));
-    g.setIndex(idx);
-    return g;
-  })();
-  const burst = new THREE.Mesh(bGeo, additive({
-    uniforms: { ...common, uOrigin: { value: C.HUB.clone() }, uLen: { value: 0 },
-      uColor: { value: LOOK.rayColor }, uIntensity: { value: 0 } },
-    vertexShader: /* glsl */`
-      attribute float aS; attribute float aSide; attribute vec3 aDir; attribute float aRnd;
-      uniform vec3 uOrigin; uniform float uLen;
-      ${RIBBON_VERT_COMMON}
-      void main() {
-        float L = uLen * (0.35 + 0.65 * aRnd);
-        ribbon(uOrigin, aDir, aS * L, 0.0, L, aSide, 0.45, 2.5, (1.0 - aS) * (0.25 + 0.75 * aRnd));
-      }`,
-    fragmentShader: RIBBON_FRAG,
-  }));
-  burst.frustumCulled = false;
-  scene.add(burst);
-
   // star glints: the hub and, once found, the dot ------------------------------------------------
   const starMat = () => additive({
     uniforms: { uSize: { value: 0 }, uIntensity: { value: 0 } },
@@ -346,6 +306,7 @@ export function createLightScan(canvas) {
           float t = 0.15 + 34.0 * x * x;                        // denser close to the camera
           float dt = t - prev; prev = t;
           vec3 p = uCam + rd * t;
+          float nearCam = smoothstep(0.6, 3.0, t);              // no fog right at the lens
           for (int i = 0; i < N; i++) {
             vec3 v = p - uHub;
             float z = dot(v, uRayDir[i]);
@@ -355,7 +316,7 @@ export function createLightScan(canvas) {
             float L = uRayLen[i];
             // seen side-on the fan glows; looking straight down its axis it would pile up, so fade that
             float side = pow(length(cross(rd, uRayDir[i])), 1.5);
-            acc += uRayStr[i] * side * exp(-(r * r) / (w * w)) * smoothstep(0.0, 0.8, z)
+            acc += nearCam * uRayStr[i] * side * exp(-(r * r) / (w * w)) * smoothstep(0.0, 0.8, z)
                    * (1.0 - smoothstep(0.3 * L, L, z)) / (1.0 + 0.6 * w) * dt;
           }
         }
@@ -420,8 +381,6 @@ export function createLightScan(canvas) {
       hazeUniforms.uRayStr.value[i] = r.haze;
     });
     dotUniforms.uTime.value = t;
-    burst.material.uniforms.uLen.value = st.burst.length;
-    burst.material.uniforms.uIntensity.value = Math.max(st.burst.alpha, 0) * 0.6;
     hubStar.material.uniforms.uSize.value = st.hub.size;
     hubStar.material.uniforms.uIntensity.value = st.hub.intensity;
     dotStar.material.uniforms.uSize.value = st.dot.size;
