@@ -3,6 +3,7 @@
 //   node scene/render.mjs                      # all frames -> scene/out/frames, scene/out/the-answer.mp4
 //   node scene/render.mjs --times 0,5.5,12     # just these moments -> scene/out/stills
 //   node scene/render.mjs --out /some/dir
+//   node scene/render.mjs --ai                 # 1080p version made for video-to-video AI restyling
 //
 // Needs Playwright with Chromium (`npm i -D playwright && npx playwright install chromium`).
 
@@ -21,6 +22,7 @@ const args = process.argv.slice(2);
 const opt = (name, dflt) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : dflt; };
 const outDir = path.resolve(opt('out', path.join(here, 'out')));
 const times = opt('times', null)?.split(',').map(Number);
+const ai = args.includes('--ai');                       // the 1080p version for AI restyling
 
 // tiny static server, so the ES modules load
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript' };
@@ -33,10 +35,10 @@ const server = http.createServer((req, res) => {
 const port = server.address().port;
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const page = await browser.newPage({ viewport: ai ? { width: 1920, height: 1080 } : { width: 1280, height: 720 } });
 page.on('pageerror', (e) => console.error('page error:', e.message));
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') console.error('console:', m.text()); });
-await page.goto(`http://127.0.0.1:${port}/index.html?capture`);
+await page.goto(`http://127.0.0.1:${port}/index.html?capture${ai ? '&ai' : ''}`);
 await page.waitForFunction(() => window.QB_READY === true, null, { timeout: 60000 });
 const { duration, fps } = await page.evaluate(() => ({ duration: window.QB.duration, fps: window.QB.fps }));
 
@@ -55,7 +57,7 @@ await browser.close();
 server.close();
 
 if (!times) {
-  const mp4 = path.join(outDir, 'the-answer.mp4');
+  const mp4 = path.join(outDir, ai ? 'the-answer-ai.mp4' : 'the-answer.mp4');
   try {
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(fps), '-i', path.join(dir, 'f_%04d.png'),
       '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '16', '-preset', 'slow', '-movflags', '+faststart', mp4]);

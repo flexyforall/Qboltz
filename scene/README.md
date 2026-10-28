@@ -33,6 +33,7 @@ without a GPU, so motion changes can be checked quickly. It can also run live in
 npx serve scene                      # then open http://localhost:3000 (any static server works)
 node scene/render.mjs                # -> scene/out/the-answer.mp4 (needs Playwright + ffmpeg)
 node scene/render.mjs --times 3,12   # single stills -> scene/out/stills
+node scene/render.mjs --ai             # 1080p version made for video-to-video AI restyling
 ```
 
 ## Tweaking

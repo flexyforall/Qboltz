@@ -17,8 +17,11 @@
 import { Vector3, Quaternion } from 'three';
 
 export const FPS = 24;
-export const WIDTH = 1280;
-export const HEIGHT = 720;
+// ?ai renders a version made for video-to-video AI restyling: 1080p, bolder shapes, and a POV
+// that sees the ray at an angle instead of dead-on (models misread a beam aimed at the lens)
+export const AI_MODE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('ai');
+export const WIDTH = AI_MODE ? 1920 : 1280;
+export const HEIGHT = AI_MODE ? 1080 : 720;
 export const HFOV = 2 * Math.atan(18 / 35);                  // a 35 mm lens on a 36 mm sensor
 export const TAN_H = Math.tan(HFOV / 2);
 export const TAN_V = TAN_H * HEIGHT / WIDTH;
@@ -170,9 +173,10 @@ function makeRoute(route) {
   return { wpT, at: (t) => geo.at(cOfS(distAt(t))) };
 }
 
-const P0 = HUB.clone().addScaledVector(U, -2.4).addScaledVector(UP, 0.35).addScaledVector(RIGHT, 0.5);
+const POV_SIDE = AI_MODE ? 1.1 : 0.5, POV_UP = AI_MODE ? 0.7 : 0.35;
+const P0 = HUB.clone().addScaledVector(U, -2.4).addScaledVector(UP, POV_UP).addScaledVector(RIGHT, POV_SIDE);
 const P0b = P0.clone().addScaledVector(U, 1.3);
-const P1 = HUB.clone().addScaledVector(U, 2.8).addScaledVector(UP, 0.5).addScaledVector(RIGHT, 1.0);
+const P1 = HUB.clone().addScaledVector(U, 2.8).addScaledVector(UP, AI_MODE ? 0.8 : 0.5).addScaledVector(RIGHT, AI_MODE ? 1.6 : 1.0);
 const TO_DOT = U.clone().applyQuaternion(new Quaternion().setFromAxisAngle(UP, 25 * Math.PI / 180))
   .add(v3(0, 0, -0.04)).normalize();
 const CF = DOT.clone().addScaledVector(TO_DOT, -11);      // final camera, beside the ray

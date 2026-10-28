@@ -105,6 +105,11 @@ function additive(params) {
   });
 }
 
+// pixel-sized things scale with the output size; the AI version also gets bolder rays and dots
+const PX = C.WIDTH / 1280;
+const RAY_BOLD = C.AI_MODE ? 1.6 : 1.0;
+const DOT_BOLD = C.AI_MODE ? 1.35 : 1.0;
+
 export function createLightScan(canvas) {
   const W = C.WIDTH, H = C.HEIGHT;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, preserveDrawingBuffer: true });
@@ -142,13 +147,13 @@ export function createLightScan(canvas) {
       const rr = radius * (1 + wobA * Math.sin(wobF * th + wobP)) + (rand() - 0.5) * 0.12;
       const p = a.clone().multiplyScalar(Math.cos(th) * rr).addScaledVector(b, Math.sin(th) * rr)
         .addScaledVector(n, (rand() - 0.5) * 0.12 + 0.25 * Math.sin(3 * th + wobP));
-      pushDot(p, n, sp, 1.1 + rand() * 0.9, 0.5 + rand() * 0.7);
+      pushDot(p, n, sp, (1.1 + rand() * 0.9) * PX * DOT_BOLD, 0.5 + rand() * 0.7);
     }
   }
   for (let i = 0; i < 5000; i++) {
     const p = new THREE.Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).multiplyScalar(60);
     if (p.length() < 1.0 || p.distanceTo(C.DOT) < 0.8) continue;
-    pushDot(p, new THREE.Vector3(0, 0, 1), 0.004 * (rand() - 0.5), 0.9 + rand() * 1.1, 0.3 + rand() * 0.9);
+    pushDot(p, new THREE.Vector3(0, 0, 1), 0.004 * (rand() - 0.5), (0.9 + rand() * 1.1) * PX * DOT_BOLD, 0.3 + rand() * 0.9);
   }
   const dotGeo = new THREE.BufferGeometry();
   dotGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -283,7 +288,7 @@ export function createLightScan(canvas) {
         vec4 mv = viewMatrix * vec4(position, 1.0);
         gl_Position = projectionMatrix * mv;
         vLit = aLit;
-        vSize = 6.0 + 90.0 * aLit;
+        vSize = (6.0 + 90.0 * aLit) * ${PX.toFixed(3)};
         gl_PointSize = -mv.z > 0.05 ? vSize : 0.0;
       }`,
     fragmentShader: /* glsl */`
@@ -396,14 +401,14 @@ export function createLightScan(canvas) {
     camera.lookAt(st.camera.target);
     camera.updateMatrixWorld();
     common.uFocus.value = st.camera.focus;
-    common.uCocK.value = st.camera.coc;
+    common.uCocK.value = st.camera.coc * PX;
 
     st.rays.forEach((r, i) => {
       const u = rayMeshes[i].material.uniforms;
       u.uDir.value.copy(r.dir);
       u.uLenPos.value = r.lenPos; u.uLenNeg.value = r.lenNeg;
       u.uCrispPos.value = r.crispPos; u.uCrispNeg.value = r.crispNeg; u.uTaper.value = r.taper;
-      u.uCoreW.value = r.core; u.uGlowW.value = r.glow; u.uIntensity.value = r.intensity;
+      u.uCoreW.value = r.core * PX * RAY_BOLD; u.uGlowW.value = r.glow * PX * RAY_BOLD; u.uIntensity.value = r.intensity;
       dotUniforms.uRayDir.value[i].copy(r.dir);
       dotUniforms.uRayLenP.value[i] = r.lenPos; dotUniforms.uRayLenN.value[i] = r.lenNeg;
       dotUniforms.uRayStr.value[i] = r.intensity;
@@ -414,9 +419,9 @@ export function createLightScan(canvas) {
       hazeUniforms.uRayStr.value[i] = r.haze;
     });
     dotUniforms.uTime.value = t;
-    hubStar.material.uniforms.uSize.value = st.hub.size;
+    hubStar.material.uniforms.uSize.value = st.hub.size * PX;
     hubStar.material.uniforms.uIntensity.value = st.hub.intensity;
-    dotStar.material.uniforms.uSize.value = st.dot.size;
+    dotStar.material.uniforms.uSize.value = st.dot.size * PX;
     dotStar.material.uniforms.uIntensity.value = st.dot.intensity;
     st.catches.forEach((c, i) => { catchLit[i] = c.intensity; });
     catchGeo.attributes.aLit.needsUpdate = true;
