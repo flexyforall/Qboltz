@@ -209,7 +209,8 @@ if __name__ == "__main__":
     pulse_d = [round(_PULSE(f / FPS), 3) if f / FPS >= PULSE_T0 and _PULSE(f / FPS) < RAY_LEN
                else -1.0 for f in range(NF)]
     out = {"fps": FPS, "frames": NF, "hub": HUB, "length": RAY_LEN,
-           "pulse": {"ray": "C", "d": pulse_d},
+           # no pulse proxy: a blocked sleeve got rendered as a literal white
+           # block riding the beam. Light is not an object -- the prompt carries it.
            "motes": motes(),
            "rays": [{"name": r["name"], "color": r["color"],
                      # C is fatter and longer so the folded rays hide INSIDE it
