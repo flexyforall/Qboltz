@@ -33,15 +33,16 @@ RAYS = [
 IC = 2
 AZ_AMP, EL_AMP, SWEEP = math.radians(45), math.radians(22), 1.6
 
-ORB_A0, ORB_SWEEP = math.radians(-100), math.radians(70)
+ORB_A0, ORB_SWEEP = math.radians(-170), math.radians(140)   # a big, readable arc
 ORB_END = ORB_A0 + ORB_SWEEP                       # camera's final bearing from the source
-# the beam points AWAY from the camera but 35 deg off its axis -- dead-on it would
-# foreshorten to a stub; at an angle it visibly stretches across the frame into depth
-BEAM_OFF = math.radians(35)
+# the beam points straight AWAY from where the arc ENDS: the arc keeps going until
+# the camera sits dead on the beam's axis, beam centred. The fold happens while the
+# camera is still off-axis, so the stretch reads before it lines up.
+BEAM_OFF = 0.0
 C_HOLD_AZ, C_HOLD_EL = ORB_END + math.pi + BEAM_OFF, math.radians(4)
-C_SETTLE = (5.0, 7.4)
-MERGE_T0, MERGE_T1 = 6.0, 8.0                      # the other five fold into C
-GROW_T0, GROW_T1 = 6.6, 8.6                        # ...and the one beam stretches far away
+C_SETTLE = (4.0, 6.0)
+MERGE_T0, MERGE_T1 = 5.0, 6.8                      # the other five fold into C
+GROW_T0, GROW_T1 = 5.4, 7.2                        # ...and the one beam stretches far away
 
 def c_hold(t): return C_HOLD_AZ + math.radians(2) * math.sin(0.4 * t), C_HOLD_EL
 def c_hold_dir(t):
@@ -136,9 +137,10 @@ SHOT = {
                     for t in TS]}}],
   "beats": [
     (0.0,  "a light source far away, ~26 m; particles swirl around it; six rays sweep the space"),
-    (0.0,  "the camera arcs slowly round the source at a distance, always facing it"),
-    (6.0,  "the rays fold into one beam pointing straight away from us"),
-    (6.6,  "that beam stretches far into the distance"),
+    (0.0,  "the camera arcs round the source at a distance, 140 deg, always facing it"),
+    (5.0,  "the rays fold into one beam while we are still well off to its side"),
+    (5.4,  "that beam stretches far into the distance; the arc carries us onto its axis"),
+    (8.6,  "the arc ends dead on the beam's axis: the beam runs straight away, centred"),
     (7.8,  "the camera breaks into a whoosh toward the source, ~16 m/s"),
     (10.1, "through the source's glow, skimming just over it"),
     (10.5, "braking to a cruise, flying just above the beam into the distance"),
