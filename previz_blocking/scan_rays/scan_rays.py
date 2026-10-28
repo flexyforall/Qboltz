@@ -174,7 +174,7 @@ _PULSE = _integrate(lambda t: (PULSE_V0 + (PULSE_V1 - PULSE_V0) * sm((t - PULSE_
 # A mote LIGHTS UP while a beam passes through it -- that is the "scanning".
 # They are also the only parallax the camera has now that the floor is gone.
 import random
-N_MOTES, MOTE_LIT_R, MOTE_CAM_CLEAR = 2400, 1.0, 0.9
+N_MOTES, MOTE_LIT_R, MOTE_CAM_CLEAR = 7000, 1.0, 0.9
 
 def _ray_dist(p, i, t):
     d = ray_dir(i, t); v = [p[k] - HUB[k] for k in range(3)]
@@ -189,11 +189,12 @@ def _ray_dist(p, i, t):
 # share v, w and a phase that advances along the stream, so the band undulates
 # as one surface. The Blender build evaluates the SAME formula.
 STREAMS = [   # centre (rel. source), flow dir, sheet normal, band half-width, speed
-    dict(c=(0, 0, -2.0),  d=(1.0, 0.25, 0.0),   n=(0.0, -0.2, 1.0), w=4.5, sp=0.22),
-    dict(c=(0, 0, 3.5),   d=(-0.4, 1.0, 0.15),  n=(0.25, 0.0, 1.0), w=3.5, sp=0.18),
-    dict(c=(-6, 4, 0.5),  d=(0.6, -0.8, 0.3),   n=(0.3, 0.4, 1.0),  w=3.0, sp=0.26),
+    dict(c=(0, 0, -2.0),  d=(1.0, 0.25, 0.0),   n=(0.0, -0.2, 1.0), w=2.4, sp=0.22),
+    dict(c=(0, 0, 3.5),   d=(-0.4, 1.0, 0.15),  n=(0.25, 0.0, 1.0), w=2.0, sp=0.18),
+    dict(c=(-6, 4, 0.5),  d=(0.6, -0.8, 0.3),   n=(0.3, 0.4, 1.0),  w=1.8, sp=0.26),
 ]
-STREAM_FRAC = 0.7
+STREAM_FRAC = 0.9    # most particles live in the bands, so the bands read
+STREAM_LEN = 24.0     # half-length of each band (m)
 
 def _unit(v):
     L = math.sqrt(sum(x * x for x in v)); return [x / L for x in v]
@@ -203,18 +204,22 @@ def mote_pos(m, t):
     return [m["p0"][k] + m["v"][k] * t + m["A"][k] * s_ for k in range(3)]
 
 def motes():
+    import numpy as np
     rnd = random.Random(7)
-    cams = [cam_pos(f / FPS) for f in range(0, NF, 2)]
+    cams = np.array([cam_pos(f / FPS) for f in range(0, NF, 2)])
+    T = np.arange(NF) / FPS
+    hub = np.array(HUB)
+    RD = np.array([[ray_dir(i, t) for t in T] for i in range(len(RAYS))])    # rays x frames x 3
     out = []
     while len(out) < N_MOTES:
         if rnd.random() < STREAM_FRAC:
             st = rnd.choice(STREAMS)
             d = _unit(st["d"]); n = _unit(st["n"])
             e2 = _unit([d[1] * n[2] - d[2] * n[1], d[2] * n[0] - d[0] * n[2], d[0] * n[1] - d[1] * n[0]])
-            u = rnd.uniform(-32, 32)                        # along the stream
+            u = rnd.uniform(-STREAM_LEN, STREAM_LEN)        # along the stream
             v_ = rnd.gauss(0, st["w"])                      # across: a dense band
             wave = 1.2 * math.sin(0.22 * u) + 0.6 * math.sin(0.31 * v_ + 1.0)
-            h = wave + rnd.gauss(0, 0.35)                   # sheet thickness
+            h = wave + rnd.gauss(0, 0.2)                    # thin sheet
             p0 = [HUB[k] + st["c"][k] + u * d[k] + v_ * e2[k] + h * n[k] for k in range(3)]
             sp = st["sp"] * rnd.uniform(0.85, 1.15)
             vel = [sp * d[k] for k in range(3)]
@@ -231,14 +236,17 @@ def motes():
             w, ph = rnd.uniform(0.3, 0.7), rnd.uniform(0, 2 * math.pi)
         m = {"p0": [round(x, 3) for x in p0], "v": [round(x, 4) for x in vel],
              "A": [round(x, 3) for x in A], "w": round(w, 3), "ph": round(ph, 3)}
+        P = (np.array(m["p0"]) + np.outer(T, m["v"])
+             + np.outer(np.sin(m["w"] * T + m["ph"]), m["A"]))                # frames x 3
         # never let a mote cross the lens
-        if any(math.dist(mote_pos(m, 2 * j / FPS), c) < MOTE_CAM_CLEAR for j, c in enumerate(cams)): continue
-        glow = []
-        for f in range(NF):
-            p = mote_pos(m, f / FPS)
-            dmin = min(_ray_dist(p, i, f / FPS) for i in range(len(RAYS)))
-            glow.append(round(1.0 - sm(dmin / MOTE_LIT_R), 3))
-        m["r"] = round(rnd.uniform(0.010, 0.025), 4); m["glow"] = glow
+        if (np.linalg.norm(P[::2][:len(cams)] - cams, axis=1) < MOTE_CAM_CLEAR).any(): continue
+        V = P - hub                                                           # frames x 3
+        U = np.einsum("rfk,fk->rf", RD, V)                                    # along each ray
+        D = np.linalg.norm(V[None] - U[..., None] * RD, axis=2)
+        D[(U < 0) | (U > RAY_LEN)] = 99.0
+        x = np.clip(D.min(axis=0) / MOTE_LIT_R, 0, 1)
+        g = 1.0 - x * x * x * (x * (6 * x - 15) + 10)
+        m["r"] = round(rnd.uniform(0.010, 0.025), 4); m["glow"] = [round(float(v), 3) for v in g]
         out.append(m)
     return out
 
