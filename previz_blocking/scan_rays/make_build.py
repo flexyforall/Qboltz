@@ -42,12 +42,33 @@ PV.slab("SET_hub", (0.6, 0.6, 0.6), (hx, hy, hz), "white", emit=4.0)
 # six rays: long thin emissive slabs pivoting on the hub, base on the pivot,
 # local +Z aimed at (az, el) -> euler XYZ = (pi/2 - el, 0, az + pi/2)
 for r in R["rays"]:
-    o = PV.slab("SET_ray_" + r["name"], (0.10, 0.10, R["length"]), (hx, hy, hz),
+    o = PV.slab("SET_ray_" + r["name"], (r.get("width", 0.10), r.get("width", 0.10),
+                r.get("length", R["length"])), (hx, hy, hz),
                 r["color"], emit=6.0, base=True)
     o.rotation_mode = 'XYZ'
     PV.bake(o, {("rotation_euler", 0): [math.pi / 2 - e for e in r["el"]],
                 ("rotation_euler", 1): [0.0] * len(r["el"]),
                 ("rotation_euler", 2): [a + math.pi / 2 for a in r["az"]]})
+
+# light pulse running out along one ray: a short white sleeve around the beam,
+# scaled to nothing whenever it is not running (d < 0)
+P = R.get("pulse")
+if P:
+    c = next(r for r in R["rays"] if r["name"] == P["ray"])
+    o = PV.slab("SET_pulse", (0.26, 0.26, 3.0), (hx, hy, hz), "white", emit=12.0, base=True)
+    o.rotation_mode = 'XYZ'
+    L = {k: [] for k in range(3)}; S = []
+    for d, az, el in zip(P["d"], c["az"], c["el"]):
+        dd = max(d, 0.0)
+        v = (math.cos(el) * math.cos(az), math.cos(el) * math.sin(az), math.sin(el))
+        for k, h0 in enumerate((hx, hy, hz)): L[k].append(h0 + v[k] * dd)
+        S.append(1.0 if d >= 0 else 0.001)
+    ch = {("location", k): L[k] for k in range(3)}
+    ch.update({("rotation_euler", 0): [math.pi / 2 - e for e in c["el"]],
+               ("rotation_euler", 1): [0.0] * len(S),
+               ("rotation_euler", 2): [a + math.pi / 2 for a in c["az"]]})
+    ch.update({("scale", k): S for k in range(3)})
+    PV.bake(o, ch)
 
 # the solver's subject is the camera's ATTENTION target -- bake it, audit
 # against it, then hide it: it is a rig part, not something in the shot

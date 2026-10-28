@@ -10,7 +10,7 @@ running out along ray C. It is hidden in the build.
 """
 import math, json, os
 
-FPS, SECONDS = 24, 19.0
+FPS, SECONDS = 24, 21.0
 NF = int(round(FPS * SECONDS))
 HUB = (0.0, 0.0, 1.2)
 RAY_LEN = 150.0
@@ -31,7 +31,13 @@ RAYS = [
 ]
 AZ_AMP, EL_MID, EL_AMP = math.radians(38), math.radians(9), math.radians(13)
 
+IC = 2                             # ray C, the one everything ends on
 C_SETTLE = (10.5, 13.0)            # ray C stops searching and holds a heading
+# every other ray folds INTO ray C: same heading, same pitch, one beam. Each
+# swings the short way round, which here is always away from the camera.
+MERGE_T0, MERGE_T1 = 12.75, 15.0   # frame 306 -> 360
+# once they are one beam, light runs out along it
+PULSE_T0, PULSE_V0, PULSE_V1 = 15.2, 6.0, 30.0
 C_HOLD_AZ, C_HOLD_EL = math.radians(250), math.radians(5)
 
 def ray_angles(i, t):
@@ -42,6 +48,12 @@ def ray_angles(i, t):
         s = sm((t - C_SETTLE[0]) / (C_SETTLE[1] - C_SETTLE[0]))
         hold_az = C_HOLD_AZ + math.radians(3) * math.sin(0.4 * t)   # slow living drift
         az, el = (1 - s) * az + s * hold_az, (1 - s) * el + s * C_HOLD_EL
+    else:
+        m = sm((t - MERGE_T0) / (MERGE_T1 - MERGE_T0))
+        if m > 0.0:
+            caz, cel = ray_angles(IC, t)
+            d = (caz - az + math.pi) % (2 * math.pi) - math.pi
+            az, el = az + m * d, el + m * (cel - el)
     return az, el
 
 def ray_dir(i, t):
@@ -51,7 +63,6 @@ def ray_dir(i, t):
 def on_ray(i, t, r):
     d = ray_dir(i, t); return tuple(HUB[k] + d[k] * r for k in range(3))
 
-IC = 2
 def lerp(a, b, u): return a + (b - a) * u
 
 def _integrate(vel):
@@ -80,10 +91,11 @@ _ORB = _integrate(_orb_v)
 def orbit_angle(t): return ORB_A0 + ORB_SWEEP * _ORB(t) / _ORB(SECONDS)
 
 # ---------------------------------------------------------------- ride ----
-# from the far side of the hub, glide past it and out along C. Ease up to a
-# cruise and keep going -- never lands, the beam pulls the camera on.
-RIDE_T0, RIDE_RAMP, RIDE_V = 11.6, 2.8, 2.0
-_RIDE = _integrate(lambda t: RIDE_V * sm((t - RIDE_T0) / RIDE_RAMP))
+# from the far side of the hub (frame 306), drift slowly straight at it, lift
+# and pass right OVER it while the rays fold into C, then fly on above the one
+# beam. Slow approach speed, then ease up to a cruise -- never lands.
+def _ride_v(t): return 1.3 * sm((t - 11.6) / 2.0) + 1.1 * sm((t - 15.6) / 2.2)
+_RIDE = _integrate(_ride_v)
 def ride_s(t): return -ORB_R + _RIDE(t)
 
 def w_ride(t): return sm((t - 11.8) / 3.2)
@@ -97,8 +109,11 @@ def cam_pos(t):
     ap = (1.0 - min(t / OPEN_T, 1.0)) ** 2
     orb = _frame(orbit_angle(t), ORB_R + OPEN_DIST * ap, 0.0, OPEN_H1 + (OPEN_H0 - OPEN_H1) * ap)
     azC, elC = ray_angles(IC, t)
-    s = ride_s(t); side = sm((t - 12.2) / 2.4)
-    ride = _frame(azC, s, -1.6 * side, OPEN_H1 + 0.7 * side + max(s, 0) * math.tan(elC))
+    s = ride_s(t)
+    h = (OPEN_H1 + 1.05 * sm((s + 3.0) / 2.6)          # lift to clear the hub top by ~1 m
+         - 0.35 * sm((s - 0.6) / 3.0)                  # then settle ~1 m above the beam
+         + max(s, 0) * math.tan(elC))                  # and climb with it
+    ride = _frame(azC, s, 0.0, h)                       # dead on the beam's line
     return [lerp(orb[k], ride[k], wc) for k in range(3)]
 
 def attention(t):
@@ -128,14 +143,26 @@ SHOT = {
     (0.0,  "high and far; flying in and down toward the hub as six rays search the floor"),
     (3.0,  "arrives level with the hub and starts a slow half-circle to the right, facing it"),
     (8.0,  "mid-orbit: the rays sweep past the lens, the hub stays centre frame"),
-    (12.5, "orbit ends opposite ray C (red), which has stopped searching and points away"),
-    (14.5, "camera glides past the hub and rides out along ray C into the distance"),
+    (12.75, "orbit ends opposite ray C (red), pointing away behind the hub; all rays start folding into it"),
+    (15.0, "one single beam; camera passes slowly right over the hub"),
+    (15.2, "a pulse of light runs out along the beam into the distance"),
+    (16.0, "camera flies straight ahead just above the beam"),
   ],
 }
 
+_PULSE = _integrate(lambda t: (PULSE_V0 + (PULSE_V1 - PULSE_V0) * sm((t - PULSE_T0) / 2.0))
+                    if t >= PULSE_T0 else 0.0)
+
 if __name__ == "__main__":
+    pulse_d = [round(_PULSE(f / FPS), 3) if f / FPS >= PULSE_T0 and _PULSE(f / FPS) < RAY_LEN
+               else -1.0 for f in range(NF)]
     out = {"fps": FPS, "frames": NF, "hub": HUB, "length": RAY_LEN,
+           "pulse": {"ray": "C", "d": pulse_d},
            "rays": [{"name": r["name"], "color": r["color"],
+                     # C is fatter and longer so the folded rays hide INSIDE it
+                     # instead of z-fighting on shared faces
+                     "width": 0.12 if r["name"] == "C" else 0.09,
+                     "length": RAY_LEN if r["name"] == "C" else RAY_LEN - 0.6,
                      "az": [round(ray_angles(i, f / FPS)[0], 5) for f in range(NF)],
                      "el": [round(ray_angles(i, f / FPS)[1], 5) for f in range(NF)]}
                     for i, r in enumerate(RAYS)]}
