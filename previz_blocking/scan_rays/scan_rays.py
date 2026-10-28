@@ -40,7 +40,7 @@ C_SETTLE = (5.0, 7.5)            # ray C stops searching and holds a heading
 # swings the short way round, which here is always away from the camera.
 MERGE_T0, MERGE_T1 = 8.0, 10.25    # frame 192 -> 246 (same 2.25 s fold)
 # once they are one beam, light runs out along it
-PULSE_T0, PULSE_V0, PULSE_V1 = 10.4, 6.0, 30.0
+PULSE_T0, PULSE_V0, PULSE_V1 = 10.4, 6.0, 40.0   # reaches the target ~12.75 s
 C_HOLD_AZ, C_HOLD_EL = math.radians(180), math.radians(5)
 
 def ray_angles(i, t):
@@ -150,6 +150,8 @@ SHOT = {
     (10.25, "one single beam; camera passes slowly right over the hub"),
     (10.4, "a pulse of light runs out along the beam into the distance"),
     (11.0, "camera flies straight ahead just above the beam"),
+    (10.3, "a point appears where the beam ends, 60 m ahead -- what it was searching for -- and swells"),
+    (12.75, "the pulse reaches the point; it swells once more"),
   ],
 }
 
@@ -161,7 +163,7 @@ _PULSE = _integrate(lambda t: (PULSE_V0 + (PULSE_V1 - PULSE_V0) * sm((t - PULSE_
 # A mote LIGHTS UP while a beam passes through it -- that is the "scanning".
 # They are also the only parallax the camera has now that the floor is gone.
 import random
-N_MOTES, MOTE_LIT_R, MOTE_CAM_CLEAR = 1200, 1.0, 0.9
+N_MOTES, MOTE_LIT_R, MOTE_CAM_CLEAR = 2400, 1.0, 0.9
 
 def _ray_dist(p, i, t):
     d = ray_dir(i, t); v = [p[k] - HUB[k] for k in range(3)]
@@ -192,12 +194,23 @@ def motes():
                     "r": round(rnd.uniform(0.010, 0.025), 4), "glow": glow})
     return out
 
+# -------------------------------------------------------------- target ----
+# what the beam was searching for: a point ON ray C, 60 m out, that appears once
+# the rays are one beam and swells as the camera flies at it; a second kick when
+# the pulse arrives. Sitting on the beam's line (and the camera dead above that
+# line) it hides the rest of the beam, so the beam reads as ENDING in it.
+TARGET_D = 60.0
+def target_r(t):
+    return 6.5 * sm((t - 10.3) / 2.4) + 1.0 * sm((t - 12.6) / 0.4)
+
 if __name__ == "__main__":
     pulse_d = [round(_PULSE(f / FPS), 3) if f / FPS >= PULSE_T0 and _PULSE(f / FPS) < RAY_LEN
                else -1.0 for f in range(NF)]
     out = {"fps": FPS, "frames": NF, "hub": HUB, "length": RAY_LEN,
            "pulse": {"ray": "C", "d": pulse_d},
            "motes": motes(),
+           "target": {"ray": "C", "dist": TARGET_D,
+                      "r": [round(target_r(f / FPS), 3) for f in range(NF)]},
            "rays": [{"name": r["name"], "color": r["color"],
                      # C is fatter and longer so the folded rays hide INSIDE it
                      # instead of z-fighting on shared faces

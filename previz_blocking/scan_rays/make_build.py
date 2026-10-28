@@ -81,6 +81,30 @@ if P:
     ch.update({("scale", k): S for k in range(3)})
     PV.bake(o, ch)
 
+# the target: what the beam was looking for. A magenta sphere riding ray C at a
+# fixed distance, scaled from nothing (0.001) to its full size.
+T = R.get("target")
+if T:
+    c = next(r for r in R["rays"] if r["name"] == T["ray"])
+    me_t = bpy.data.meshes.get("TARGET_sphere")
+    if me_t is None:
+        import bmesh as _bm
+        me_t = bpy.data.meshes.new("TARGET_sphere"); b = _bm.new()
+        _bm.ops.create_uvsphere(b, u_segments=32, v_segments=16, radius=1.0)
+        b.to_mesh(me_t); b.free()
+        for p in me_t.polygons: p.use_smooth = True
+    o = bpy.data.objects.new("SET_target", me_t); PV.coll("SET").objects.link(o)
+    o.data.materials.clear(); o.data.materials.append(PV._matfor("magenta", emit=6.0))
+    o.color = (*PV.PALETTE["magenta"], 1.0)
+    L = {k: [] for k in range(3)}; S = []
+    for rr, az, el in zip(T["r"], c["az"], c["el"]):
+        v = (math.cos(el) * math.cos(az), math.cos(el) * math.sin(az), math.sin(el))
+        for k, h0 in enumerate((hx, hy, hz)): L[k].append(h0 + v[k] * T["dist"])
+        S.append(max(rr, 0.001))
+    ch = {("location", k): L[k] for k in range(3)}
+    ch.update({("scale", k): S for k in range(3)})
+    PV.bake(o, ch)
+
 # motes: small round points drifting slowly in space. Dim grey-white at rest,
 # ORANGE while a beam passes through them -- that flash is the scan.
 import bmesh
