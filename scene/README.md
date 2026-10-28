@@ -25,6 +25,7 @@ without a GPU, so motion changes can be checked quickly. It can also run live in
 - `index.html`: plays the scene live. Space pauses, ←/→ steps a frame.
 - `render.mjs`: renders frames and an MP4 in headless Chromium.
 - `vendor/three`: three.js r170 (MIT), so nothing loads from the network.
+- `previews/the-answer.mp4`: the latest render, 1280×720.
 
 ## Run
 
