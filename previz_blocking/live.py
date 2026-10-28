@@ -45,13 +45,3 @@ blk.hide_render = True
 blk.hide_set(True)
 
 print(PV.viewport_ready())
-
-# ---- live_link TEST: a sign above the hub. MK_ prefix -> wiped by the next real pass
-import math as _m
-_cu = bpy.data.curves.get("MK_LIVE_TEST") or bpy.data.curves.new("MK_LIVE_TEST", 'FONT')
-_cu.body, _cu.size, _cu.align_x, _cu.extrude = "LIVE OK", 0.45, 'CENTER', 0.03
-_t = bpy.data.objects.get("MK_LIVE_TEST") or bpy.data.objects.new("MK_LIVE_TEST", _cu)
-if _t.name not in PV.coll("MARKERS").objects: PV.coll("MARKERS").objects.link(_t)
-_t.location = (0.0, 0.0, 2.0)
-_t.rotation_euler = (_m.radians(90), 0.0, _m.radians(-40))   # stands up, faces the frame-1 camera
-_t.data.materials.clear(); _t.data.materials.append(PV._matfor("magenta", emit=4.0))
