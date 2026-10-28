@@ -23,14 +23,15 @@ def win(t, a, b, c, d):            # 0 -> 1 over a..b, hold, 1 -> 0 over c..d
 
 # base azimuth (deg), colour, and the chaos phases of each ray
 RAYS = [
-    # A sweeps across the camera's arc: phase-shifted and pitched UP 10 deg so it
-    # passes over the lens (>= 0.95 m, the same as the pass over the source)
-    dict(name="A", az=-30, color="cyan",   w=(0.71, 1.13, 0.53, 0.97), p=(2.7, 2.1, 1.0, 4.0), el_bias=10),
-    dict(name="B", az= 30, color="green",  w=(0.83, 0.59, 1.07, 0.61), p=(1.7, 0.4, 2.6, 0.9)),
-    dict(name="C", az=180, color="red",    w=(0.64, 1.21, 0.77, 0.49), p=(2.9, 1.3, 0.2, 3.3)),
-    dict(name="D", az=150, color="yellow", w=(0.92, 0.67, 0.58, 1.17), p=(0.8, 3.7, 1.9, 2.2)),
-    dict(name="E", az=250, color="yellow", w=(0.57, 1.03, 0.89, 0.73), p=(3.4, 0.6, 2.8, 1.4)),
-    dict(name="F", az= 90, color="yellow", w=(1.09, 0.79, 0.66, 0.84), p=(2.2, 2.9, 3.9, 0.1)),
+    # phases are SEARCHED, not hand-set: every ray keeps moving on screen (its
+    # slowest half-second >= 12 deg/s against the orbiting camera) and never
+    # comes within 0.65 m of the lens. A is pitched up 10 deg to clear the arc.
+    dict(name="A", az=-30, color="cyan",   w=(0.71, 1.13, 0.53, 0.97), p=(1.98, 1.44, 1.82, 0.44), el_bias=10),
+    dict(name="B", az= 30, color="green",  w=(0.83, 0.59, 1.07, 0.61), p=(4.12, 3.52, 1.78, 4.5)),
+    dict(name="C", az=180, color="red",    w=(0.64, 1.21, 0.77, 0.49), p=(0.07, 6.23, 5.02, 1.3)),
+    dict(name="D", az=150, color="yellow", w=(0.92, 0.67, 0.58, 1.17), p=(1.75, 3.44, 1.17, 5.64)),
+    dict(name="E", az=250, color="yellow", w=(0.57, 1.03, 0.89, 0.73), p=(5.2, 4.82, 6.19, 0.63)),
+    dict(name="F", az= 90, color="yellow", w=(1.09, 0.79, 0.66, 0.84), p=(3.88, 5.67, 0.45, 6.21)),
 ]
 AZ_AMP, EL_MID, EL_AMP = math.radians(38), math.radians(9), math.radians(13)
 
