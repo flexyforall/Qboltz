@@ -120,18 +120,13 @@ for i, mo in enumerate(R.get("motes", [])):
     o = bpy.data.objects.new("SET_mote_%%03d" %% i, me); mc.objects.link(o)
     o.scale = (mo["r"],) * 3
     o.color = (*BASE, 1.0)
-    p0, v, A, w, ph = mo["p0"], mo["v"], mo["A"], mo["w"], mo["ph"]
+    p0, v = mo["p0"], mo["v"]
     cb = PV._cbag(o, "ACT_mote_%%03d" %% i, 'OBJECT', o.name)
-    fr = list(range(1, NF + 1, 4)) + ([NF] if (NF - 1) %% 4 else [])
-    for k in range(3):                       # p0 + v t + A sin(w t + ph), keyed every 4 frames
+    for k in range(3):                       # straight constant drift: 2 linear keys
         fc = cb.fcurves.new("location", index=k)
-        fc.keyframe_points.add(len(fr))
-        co = []
-        for f in fr:
-            t = (f - 1) / R["fps"]
-            co += [f, p0[k] + v[k] * t + A[k] * math.sin(w * t + ph)]
-        fc.keyframe_points.foreach_set("co", co)
-        fc.keyframe_points.foreach_set("interpolation", [1] * len(fr)); fc.update()
+        fc.keyframe_points.add(2)
+        fc.keyframe_points.foreach_set("co", [1, p0[k], NF, p0[k] + v[k] * (NF - 1) / R["fps"]])
+        fc.keyframe_points.foreach_set("interpolation", [1, 1]); fc.update()
     gk = mo["gk"]
     if gk:
         for k in range(3):
