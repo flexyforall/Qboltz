@@ -23,9 +23,9 @@ def win(t, a, b, c, d):            # 0 -> 1 over a..b, hold, 1 -> 0 over c..d
 
 # base azimuth (deg), colour, and the chaos phases of each ray
 RAYS = [
-    # A pitched down 8 deg: it sweeps across the camera's arc, and this keeps it
-    # passing under the lens (>= 0.59 m) instead of through it
-    dict(name="A", az=-30, color="cyan",   w=(0.71, 1.13, 0.53, 0.97), p=(0.3, 2.1, 1.0, 4.0), el_bias=-8),
+    # A sweeps across the camera's arc: phase-shifted and pitched UP 10 deg so it
+    # passes over the lens (>= 0.95 m, the same as the pass over the source)
+    dict(name="A", az=-30, color="cyan",   w=(0.71, 1.13, 0.53, 0.97), p=(2.7, 2.1, 1.0, 4.0), el_bias=10),
     dict(name="B", az= 30, color="green",  w=(0.83, 0.59, 1.07, 0.61), p=(1.7, 0.4, 2.6, 0.9)),
     dict(name="C", az=180, color="red",    w=(0.64, 1.21, 0.77, 0.49), p=(2.9, 1.3, 0.2, 3.3)),
     dict(name="D", az=150, color="yellow", w=(0.92, 0.67, 0.58, 1.17), p=(0.8, 3.7, 1.9, 2.2)),
@@ -35,22 +35,33 @@ RAYS = [
 AZ_AMP, EL_MID, EL_AMP = math.radians(38), math.radians(9), math.radians(13)
 
 IC = 2                             # ray C, the one everything ends on
-C_SETTLE = (5.0, 7.5)            # ray C stops searching and holds a heading
+C_SETTLE = (7.2, 9.6)            # ray C searches through the whole arc, then locks during the fold
 # every other ray folds INTO ray C: same heading, same pitch, one beam. Each
 # swings the short way round, which here is always away from the camera.
 MERGE_T0, MERGE_T1 = 8.0, 10.25    # frame 192 -> 246 (same 2.25 s fold)
 # once they are one beam, light runs out along it
 PULSE_T0, PULSE_V0, PULSE_V1 = 10.4, 6.0, 40.0
 C_HOLD_AZ, C_HOLD_EL = math.radians(180), math.radians(5)
+SWEEP = 1.6                        # sweep-speed multiplier: rays never look parked against the orbit
+
+def c_hold(t):
+    """ray C's final heading (with its slow living drift). The camera's ride is
+    built on THIS, not on C's live angle, so C can keep searching late without
+    dragging the camera around."""
+    return C_HOLD_AZ + math.radians(3) * math.sin(0.4 * t), C_HOLD_EL
+
+def c_hold_dir(t):
+    az, el = c_hold(t)
+    return (math.cos(el) * math.cos(az), math.cos(el) * math.sin(az), math.sin(el))
 
 def ray_angles(i, t):
-    r = RAYS[i]; w, p = r["w"], r["p"]
+    r = RAYS[i]; w, p = [x * SWEEP for x in r["w"]], r["p"]
     az = math.radians(r["az"]) + AZ_AMP * (0.6 * math.sin(w[0] * t + p[0]) + 0.4 * math.sin(w[1] * t + p[1]))
     el = EL_MID + math.radians(r.get("el_bias", 0)) + EL_AMP * (0.55 * math.sin(w[2] * t + p[2]) + 0.45 * math.sin(w[3] * t + p[3]))
     if r["name"] == "C":
         s = sm((t - C_SETTLE[0]) / (C_SETTLE[1] - C_SETTLE[0]))
-        hold_az = C_HOLD_AZ + math.radians(3) * math.sin(0.4 * t)   # slow living drift
-        az, el = (1 - s) * az + s * hold_az, (1 - s) * el + s * C_HOLD_EL
+        hold_az, hold_el = c_hold(t)
+        az, el = (1 - s) * az + s * hold_az, (1 - s) * el + s * hold_el
     else:
         m = sm((t - MERGE_T0) / (MERGE_T1 - MERGE_T0))
         if m > 0.0:
@@ -111,7 +122,7 @@ def cam_pos(t):
     wc = w_ride(t)
     ap = (1.0 - min(t / OPEN_T, 1.0)) ** 2
     orb = _frame(orbit_angle(t), ORB_R + OPEN_DIST * ap, 0.0, OPEN_H1 + (OPEN_H0 - OPEN_H1) * ap)
-    azC, elC = ray_angles(IC, t)
+    azC, elC = c_hold(t)
     s = ride_s(t)
     h = (OPEN_H1 + 1.05 * sm((s + 3.0) / 2.6)          # lift to clear the hub top by ~1 m
          - 0.35 * sm((s - 0.6) / 3.0)                  # then settle ~1 m above the beam
@@ -121,7 +132,8 @@ def cam_pos(t):
 
 def attention(t):
     wc = w_ride(t)
-    p = on_ray(IC, t, max(ride_s(t), 0) + 6.0)
+    d = c_hold_dir(t); r = max(ride_s(t), 0) + 6.0
+    p = [HUB[k] + d[k] * r for k in range(3)]
     return [lerp(HUB[k], p[k], wc) for k in range(3)]
 
 ATT = 1.0                          # attention box edge (m); pos is its BASE
