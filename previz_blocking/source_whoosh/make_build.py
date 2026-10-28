@@ -51,7 +51,22 @@ hx, hy, hz = R["hub"]
 # six rays: long thin emissive slabs pivoting on the hub, base on the pivot,
 # local +Z aimed at (az, el) -> euler XYZ = (pi/2 - el, 0, az + pi/2)
 for r in R["rays"]:
-    if r.get("taper"):
+    if r.get("cone"):
+        # a soft cone of light: tiny at the source, opening to a fixed far width.
+        # Translucent so it reads as scattered light, not a solid object.
+        nm = "SET_ray_" + r["name"]
+        old = bpy.data.objects.get(nm)
+        if old: bpy.data.objects.remove(old, do_unlink=True)
+        hw0, hw1, L = 0.03, r["cone"], r.get("length", R["length"])
+        me_r = bpy.data.meshes.new(nm + "_m")
+        me_r.from_pydata([(-hw0, -hw0, 0), (hw0, -hw0, 0), (hw0, hw0, 0), (-hw0, hw0, 0),
+                          (-hw1, -hw1, L), (hw1, -hw1, L), (hw1, hw1, L), (-hw1, hw1, L)], [],
+                         [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)])
+        me_r.update()
+        o = bpy.data.objects.new(nm, me_r); PV.coll("SET").objects.link(o)
+        o.location = (hx, hy, hz)
+        o.data.materials.append(PV._matfor(r["color"], emit=6.0))
+    elif r.get("taper"):
         # a thin pyramid: square base on the source, apex at the far end -- the ray
         # narrows to nothing instead of stopping on a cut face
         nm = "SET_ray_" + r["name"]
@@ -69,13 +84,16 @@ for r in R["rays"]:
         o = PV.slab("SET_ray_" + r["name"], (r.get("width", 0.10), r.get("width", 0.10),
                     r.get("length", R["length"])), (hx, hy, hz),
                     r["color"], emit=6.0, base=True)
-    o.color = (*PV.PALETTE[r["color"]], 1.0)
+    o.color = (*PV.PALETTE[r["color"]], 0.3 if r.get("cone") else 1.0)
     o.rotation_mode = 'XYZ'
     ch = {("rotation_euler", 0): [math.pi / 2 - e for e in r["el"]],
           ("rotation_euler", 1): [0.0] * len(r["el"]),
           ("rotation_euler", 2): [a + math.pi / 2 for a in r["az"]]}
     if "len" in r:                           # rays reach SCAN length, then stretch far away
         ch[("scale", 2)] = [L / r.get("length", R["length"]) for L in r["len"]]
+    if "merged_at" in r:                     # folded into the hero: gone, one ray remains
+        sx = [1.0 if f < r["merged_at"] else 0.001 for f in range(len(r["el"]))]
+        ch[("scale", 0)] = sx; ch[("scale", 1)] = sx
     PV.bake(o, ch)
 
 # light pulse running out along one ray: a short white sleeve around the beam,

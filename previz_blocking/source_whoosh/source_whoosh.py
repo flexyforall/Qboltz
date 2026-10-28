@@ -15,7 +15,12 @@ FPS, SECONDS = 24, 13.0
 NF = int(round(FPS * SECONDS))
 HUB = (0.0, 0.0, 0.0)                 # the source, floating in space
 RAY_LEN = 150.0                       # slab length; drawn shorter via scale
-SCAN_LEN = 20.0                       # rays reach this far while searching (tapered: no hard end)
+SCAN_LEN = 20.0                       # rays reach this far while searching
+# rays are DIFFUSE CONES of scattered light, like the reference: narrow at the
+# source, opening ~6 deg each side. The cone's far width is fixed, so when the
+# hero stretches 20 -> 150 m it narrows on its own into a focused beam.
+CONE_HALF = math.radians(6)
+CONE_END_HW = SCAN_LEN * math.tan(CONE_HALF)
 
 def sm(x):
     x = max(0.0, min(1.0, x)); return x * x * x * (x * (6 * x - 15) + 10)
@@ -182,7 +187,9 @@ def motes():
         U = np.einsum("rfk,fk->rf", RD, V)
         D = np.linalg.norm(V[None] - U[..., None] * RD, axis=2)
         D[(U < 0) | (U > RL)] = 99.0
-        x = np.clip(D.min(axis=0) / MOTE_LIT_R, 0, 1)
+        # inside a cone: allowed radius grows linearly from the source to the far end
+        RAD = np.clip(U, 0, None) / RL * CONE_END_HW + 0.3
+        x = np.clip((D / RAD).min(axis=0), 0, 1)
         g = 1.0 - x * x * x * (x * (6 * x - 15) + 10)
         m["r"] = round(rnd.uniform(0.03, 0.045), 4)
         m["glow"] = [round(float(z), 3) for z in g]
@@ -192,10 +199,10 @@ def motes():
 if __name__ == "__main__":
     out = {"fps": FPS, "frames": NF, "hub": HUB, "length": RAY_LEN, "mote_motion": "swirl",
            "rays": [{"name": r["name"], "color": r["color"],
-                     # TAPERED to a point so a ray fades out instead of ending in a
-                     # cut face; all one width so the hero never reads as "stronger"
-                     "taper": True,
-                     "width": 0.10 if r["name"] == "C" else 0.09,
+                     # a cone of light: far half-width fixed, length animated
+                     "cone": round(CONE_END_HW * (1.0 if r["name"] == "C" else 0.97), 3),
+                     # once folded in, the other five vanish: only ONE cone remains
+                     **({} if r["name"] == "C" else {"merged_at": int(round(MERGE_T1 * FPS))}),
                      "length": RAY_LEN,
                      "az": [round(ray_angles(i, f / FPS)[0], 5) for f in range(NF)],
                      "el": [round(ray_angles(i, f / FPS)[1], 5) for f in range(NF)],
