@@ -1,0 +1,338 @@
+// "The Answer": choreography. Pure math, no rendering, so it can be checked in Node too.
+//
+// Story (seconds):
+//   0   - 2.6   the hub (dead centre) ignites, 5 rays of different strength grow out of it
+//   2.6 - 8.5   the camera visits the rays one by one, following each as it sweeps;
+//               the others stay in frame, softer, in the background
+//   8.5 - 10    the rays swing together and merge into one, pointing at an ordinary dot
+//               (there from the first frame); the camera moves in behind the hub
+//   10  - 11.4  POV: the ray runs straight ahead of us and stretches into the distance
+//               until it lands on the dot, which ignites
+//   11.4 - 13   we travel along the ray
+//   13  - 16.6  we drift out to the side, easing onto the hero frame: the dot at 72% / 33%,
+//               its ray trailing left. Hold until 19 s.
+//
+// World: Z up, units are arbitrary. The hub sits at the origin.
+
+import { Vector3, Quaternion } from 'three';
+
+export const FPS = 24;
+export const WIDTH = 1280;
+export const HEIGHT = 720;
+export const HFOV = 2 * Math.atan(18 / 35);                  // a 35 mm lens on a 36 mm sensor
+export const TAN_H = Math.tan(HFOV / 2);
+export const TAN_V = TAN_H * HEIGHT / WIDTH;
+export const VFOV_DEG = 2 * Math.atan(TAN_V) * 180 / Math.PI;
+
+const UP = new Vector3(0, 0, 1);
+const v3 = (x, y, z) => new Vector3(x, y, z);
+
+// easing ---------------------------------------------------------------------------
+const clamp01 = (x) => Math.min(Math.max(x, 0), 1);
+export const smooth = (x) => { x = clamp01(x); return x * x * (3 - 2 * x); };
+export const smoother = (x) => { x = clamp01(x); return x * x * x * (x * (6 * x - 15) + 10); };
+export const ramp = (t, t0, t1, a, b, ease = smooth) => a + (b - a) * ease((t - t0) / (t1 - t0));
+
+function slerpVec(a, b, k) {
+  const d = Math.min(Math.max(a.dot(b), -1), 1);
+  const th = Math.acos(d);
+  if (th < 1e-5) return a.clone().lerp(b, k).normalize();
+  const s = Math.sin(th);
+  return a.clone().multiplyScalar(Math.sin((1 - k) * th) / s)
+    .add(b.clone().multiplyScalar(Math.sin(k * th) / s)).normalize();
+}
+
+// Smooth curve through (time, Vector3) keys: cubic Hermite with Catmull-Rom tangents.
+// A key equal to its neighbour is a hold (zero tangent), so holds never overshoot.
+class Track {
+  constructor(keys) { this.k = keys; }
+  tangent(i) {
+    const k = this.k;
+    if (i === 0 || i === k.length - 1) return v3(0, 0, 0);
+    if (k[i - 1][1].distanceTo(k[i][1]) < 1e-9 || k[i + 1][1].distanceTo(k[i][1]) < 1e-9) return v3(0, 0, 0);
+    return k[i + 1][1].clone().sub(k[i - 1][1]).divideScalar(k[i + 1][0] - k[i - 1][0]);
+  }
+  at(t) {
+    const k = this.k;
+    if (t <= k[0][0]) return k[0][1].clone();
+    if (t >= k[k.length - 1][0]) return k[k.length - 1][1].clone();
+    let i = 0;
+    while (k[i + 1][0] <= t) i++;
+    const [t0, p0] = k[i], [t1, p1] = k[i + 1];
+    const h = t1 - t0, s = (t - t0) / h;
+    const h00 = 2 * s ** 3 - 3 * s ** 2 + 1, h10 = s ** 3 - 2 * s ** 2 + s;
+    const h01 = -2 * s ** 3 + 3 * s ** 2, h11 = s ** 3 - s ** 2;
+    return p0.clone().multiplyScalar(h00)
+      .add(this.tangent(i).multiplyScalar(h10 * h))
+      .add(p1.clone().multiplyScalar(h01))
+      .add(this.tangent(i + 1).multiplyScalar(h11 * h));
+  }
+}
+
+// camera helpers ------------------------------------------------------------------------
+// camera basis for a level camera looking along f: right, up (screen), forward
+function basis(f) {
+  const fw = f.clone().normalize();
+  const r = fw.clone().cross(UP).normalize();
+  const u = r.clone().cross(fw);
+  return { r, u, f: fw };
+}
+
+export function toScreen(camPos, look, p) {
+  const { r, u, f } = basis(look);
+  const d = p.clone().sub(camPos);
+  const z = d.dot(f);
+  return { x: 0.5 + 0.5 * (d.dot(r) / z) / TAN_H, y: 0.5 - 0.5 * (d.dot(u) / z) / TAN_V, z };
+}
+
+// level camera direction that puts world direction `dir` at screen position (sx, sy)
+function aim(dir, sx, sy) {
+  let yaw = Math.atan2(dir.y, dir.x), pitch = Math.asin(dir.z);
+  const fv = (y, p) => v3(Math.cos(p) * Math.cos(y), Math.cos(p) * Math.sin(y), Math.sin(p));
+  const scr = (y, p) => { const s = toScreen(v3(0, 0, 0), fv(y, p), dir); return [s.x, s.y]; };
+  for (let it = 0; it < 40; it++) {
+    const [x0, y0] = scr(yaw, pitch);
+    const ex = x0 - sx, ey = y0 - sy;
+    if (Math.abs(ex) + Math.abs(ey) < 1e-7) break;
+    const e = 1e-4;
+    const [xa, ya] = scr(yaw + e, pitch), [xb, yb] = scr(yaw, pitch + e);
+    const j = [(xa - x0) / e, (xb - x0) / e, (ya - y0) / e, (yb - y0) / e];
+    const det = j[0] * j[3] - j[1] * j[2];
+    yaw -= (j[3] * ex - j[1] * ey) / det;
+    pitch -= (-j[2] * ex + j[0] * ey) / det;
+  }
+  return fv(yaw, pitch);
+}
+
+// the scene ---------------------------------------------------------------------------
+export const HUB = v3(0, 0, 0);
+export const U = v3(1, -0.25, 0.1).normalize();            // where the merged ray points
+export const DOT = U.clone().multiplyScalar(14);           // the answer: an ordinary dot
+const RIGHT = U.clone().cross(UP).normalize();             // camera-right while looking along U
+export const SEARCH_LEN = 9;                               // rays reach this far while searching
+
+//            yaw/s  wobble wob-f pitch-amp p-f   phase  strength core px glow px
+export const RAYS = [
+  { ys: 0.14, wob: 0.35, wf: 0.21, pa: 0.30, pf: 0.17, ph: 0.0, str: 1.00, core: 2.4, glow: 16 },
+  { ys: -0.11, wob: 0.40, wf: 0.16, pa: 0.35, pf: 0.23, ph: 1.3, str: 0.70, core: 2.0, glow: 13 },
+  { ys: 0.12, wob: 0.30, wf: 0.27, pa: 0.28, pf: 0.14, ph: 2.1, str: 0.55, core: 1.7, glow: 11 },
+  { ys: -0.13, wob: 0.35, wf: 0.19, pa: 0.32, pf: 0.21, ph: 0.7, str: 0.42, core: 1.4, glow: 9 },
+  { ys: 0.10, wob: 0.30, wf: 0.24, pa: 0.26, pf: 0.28, ph: 2.8, str: 0.32, core: 1.2, glow: 8 },
+];
+const WIN = 0;                                             // the others merge into this one
+
+// camera route ----------------------------------------------------------------------
+// The path (where the camera goes) and the timing (how fast) are separate: positions come from a
+// smooth curve through the waypoints, re-parameterised by arc length; each waypoint gets a speed
+// and each stretch lasts exactly as long as a straight speed ramp needs, so speed never bulges.
+const orbit = (deg, r, z) => v3(r * Math.cos(deg * Math.PI / 180), r * Math.sin(deg * Math.PI / 180), z);
+const P0 = HUB.clone().addScaledVector(U, -3.2).addScaledVector(UP, 0.4).addScaledVector(RIGHT, 0.6);
+const P0b = P0.clone().addScaledVector(U, 1.2);
+const P1 = HUB.clone().addScaledVector(U, 2.8).addScaledVector(UP, 0.5).addScaledVector(RIGHT, 1.0);
+const TO_DOT = U.clone().applyQuaternion(new Quaternion().setFromAxisAngle(UP, 25 * Math.PI / 180))
+  .add(v3(0, 0, -0.04)).normalize();
+const CF = DOT.clone().addScaledVector(TO_DOT, -11);      // final camera, beside the ray
+const FINAL_LOOK = aim(TO_DOT, 0.72, 0.33);               // the dot lands exactly on the hero spot
+
+//                 waypoint                  speed (units/s)
+const ROUTE = [[orbit(-108, 9.6, 1.4), 0.3],             // wide, the hub dead centre
+  [orbit(-130, 9.4, 1.8), 1.6],
+  [orbit(-152, 9.0, 1.1), 1.8],
+  [orbit(-172, 8.4, 0.7), 1.7],
+  [P0, 1.1],                                              // behind the hub, on the ray: POV
+  [P0b, 1.0],
+  [P1, 3.6],                                              // travelling along the ray
+  [CF, 0.0]];                                             // eased to rest on the hero frame
+const I_POV = 4;
+
+const chord = [0];
+for (let i = 1; i < ROUTE.length; i++) chord.push(chord[i - 1] + ROUTE[i][0].distanceTo(ROUTE[i - 1][0]));
+const geo = new Track(ROUTE.map(([p], i) => [chord[i], p]));
+const N_ARC = 4000;
+const arcC = [], arcS = [0];
+for (let k = 0; k <= N_ARC; k++) arcC.push(chord[chord.length - 1] * k / N_ARC);
+for (let k = 1; k <= N_ARC; k++) arcS.push(arcS[k - 1] + geo.at(arcC[k]).distanceTo(geo.at(arcC[k - 1])));
+const sOfC = (c) => {
+  const x = c / chord[chord.length - 1] * N_ARC, k = Math.min(Math.floor(x), N_ARC - 1);
+  return arcS[k] + (arcS[k + 1] - arcS[k]) * (x - k);
+};
+const cOfS = (s) => {
+  let lo = 0, hi = N_ARC;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (arcS[m] <= s) lo = m; else hi = m; }
+  const k = (s - arcS[lo]) / Math.max(arcS[hi] - arcS[lo], 1e-9);
+  return arcC[lo] + k * (arcC[hi] - arcC[lo]);
+};
+const wpS = chord.map(sOfC);
+const wpT = [0];
+for (let i = 1; i < ROUTE.length; i++) {
+  const v0 = ROUTE[i - 1][1], v1 = ROUTE[i][1];
+  // the final stretch is a pure ease-out (v0 * (1 - x)^2 covers v0 * h / 3): no jolt at rest
+  const h = v1 === 0 ? 3 * (wpS[i] - wpS[i - 1]) / v0 : 2 * (wpS[i] - wpS[i - 1]) / (v0 + v1);
+  wpT.push(wpT[i - 1] + h);
+}
+function distAt(t) {
+  if (t >= wpT[wpT.length - 1]) return wpS[wpS.length - 1];
+  let i = 0;
+  while (wpT[i + 1] <= t) i++;
+  const h = wpT[i + 1] - wpT[i], x = (t - wpT[i]) / h, v0 = ROUTE[i][1], v1 = ROUTE[i + 1][1];
+  return (2 * x ** 3 - 3 * x ** 2 + 1) * wpS[i] + (x ** 3 - 2 * x ** 2 + x) * h * v0
+    + (-2 * x ** 3 + 3 * x ** 2) * wpS[i + 1] + (x ** 3 - x ** 2) * h * v1;
+}
+const camTrack = { at: (t) => geo.at(cOfS(distAt(t))) };
+
+// key moments follow the camera, so retiming the route keeps the story in sync
+export const T_POV = wpT[I_POV];                          // camera is behind the hub
+const T_REST = wpT[wpT.length - 1];
+export const DURATION = T_REST + 1.8;
+
+// which ray the camera features, when, and at what angle it should be seen
+const T_VISITS = 2.6;
+const VISIT_LEN = (T_POV - 1.6 - T_VISITS) / 3;           // three visits fill the time until the merge
+const VISITS = [[0, 0.45], [1, -0.5], [2, 0.3]].map(([ray, tilt], n) => (
+  { ray, tilt, t0: T_VISITS + n * VISIT_LEN, t1: T_VISITS + (n + 1) * VISIT_LEN }));
+
+function freeAngles(r, t) {
+  return [r.y0 + r.ys * t + r.wob * Math.sin(r.wf * t + r.ph), r.p0 + r.pa * Math.sin(r.pf * t + r.ph)];
+}
+function fromAngles(yaw, pitch) {
+  return v3(Math.cos(pitch) * Math.cos(yaw), Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch));
+}
+
+// Phase each featured ray so that, mid-visit, it lies across the view (not end-on) at the
+// visit's tilt; the others are spread around evenly.
+RAYS.forEach((r, i) => { r.y0 = i * 2.4; r.p0 = 0; });
+for (const v of VISITS) {
+  const r = RAYS[v.ray];
+  const tm = (v.t0 + v.t1) / 2;
+  const view = HUB.clone().sub(camTrack.at(tm)).normalize();
+  const across = view.clone().cross(UP).normalize();
+  const want = across.applyAxisAngle(view, v.tilt);
+  r.y0 = 0; r.p0 = 0;
+  const [yf, pf] = freeAngles(r, tm);
+  r.y0 = Math.atan2(want.y, want.x) - yf;
+  r.p0 = Math.asin(want.z) - pf;
+  v.side = Math.sign(want.dot(camTrack.at(tm).sub(HUB))) || 1;  // the half facing the camera
+}
+
+const T_MERGE0 = T_POV - 1.6, T_MERGE1 = T_POV;
+// which way along U each ray's +direction ends up, so the stretch happens on the right half
+const MERGE_SIGN = RAYS.map((r) => Math.sign(fromAngles(...freeAngles(r, T_MERGE0)).dot(U)) || 1);
+
+export function rayDir(i, t) {
+  const d = fromAngles(...freeAngles(RAYS[i], t));
+  return slerpVec(d, U.clone().multiplyScalar(MERGE_SIGN[i]), smoother((t - T_MERGE0) / (T_MERGE1 - T_MERGE0)));
+}
+
+function rayState(i, t) {
+  const r = RAYS[i];
+  const start = 0.5 + 0.35 * i;                              // rays leave the hub one by one
+  const grow = SEARCH_LEN * smooth((t - start) / 1.8) ** 1.2;
+  const stretch = smoother((t - T_POV) / 1.4);               // reaches out to the dot in POV
+  const toDot = grow + (DOT.length() - grow) * stretch;
+  const merge = smoother((t - T_MERGE0) / (T_MERGE1 - T_MERGE0));
+  // after the merge every ray lies on the same line, so they all stretch together
+  const fwd = MERGE_SIGN[i] > 0 ? toDot : grow;
+  const back = MERGE_SIGN[i] > 0 ? grow : toDot;
+  const crisp = 0.92 * smoother((t - T_POV - 0.6) / 0.8);    // the end turns sharp: it lands
+  const flicker = r.str > 0.5 ? 1 : 0.85 + 0.15 * Math.sin(7.3 * t + r.ph) * Math.sin(3.1 * t);
+  let k = r.str * flicker * ramp(t, start, start + 0.15, 0, 1);
+  k *= i === WIN ? 1 + 0.2 * merge : 1 - 0.85 * merge;      // merged: one strong ray, not a blown-out sum
+  // while the camera features a ray, the others step back (still in frame, just not prominent)
+  let featured = 0, visitW = 0;
+  VISITS.forEach((v) => {
+    const w = smooth((t - (v.t0 - 0.4)) / 0.8) - smooth((t - (v.t1 - 0.4)) / 0.8);
+    visitW += w; if (v.ray === i) featured += w;
+  });
+  k *= 1 - 0.5 * clamp01(visitW) * (1 - featured);
+  return {
+    dir: rayDir(i, t),
+    lenPos: Math.max(fwd, 0.01), lenNeg: Math.max(back, 0.01),
+    crispPos: MERGE_SIGN[i] > 0 ? crisp : 0, crispNeg: MERGE_SIGN[i] > 0 ? 0 : crisp,
+    intensity: k, core: r.core, glow: r.glow,
+    haze: k * (i === WIN ? 1 : 1 - merge),                   // merged: one haze fan, not five stacked
+    taper: 0.85 * smoother((t - wpT[I_POV + 2]) / 2.5),      // leaving the ray: its tail fades towards the hub
+  };
+}
+
+// camera aim: hub first, then each featured ray (a point along it, following its sweep),
+// then the dot; finally it eases onto the hero framing. Smoothed over time afterwards.
+function aimTargets(t) {
+  const list = [{ w: 1 - smooth((t - 2.2) / 0.8), p: HUB.clone() }];
+  VISITS.forEach((v, n) => {
+    const wIn = n === 0 ? smooth((t - 2.2) / 0.8) : smooth((t - (v.t0 - 0.4)) / 0.8);
+    const wOut = n === VISITS.length - 1 ? smooth((t - (T_MERGE0 - 0.4)) / 0.8) : smooth((t - (v.t1 - 0.4)) / 0.8);
+    list.push({ w: wIn - wOut, p: HUB.clone().addScaledVector(rayDir(v.ray, t), 1.8 * v.side) });
+  });
+  list.push({ w: smooth((t - (T_MERGE0 - 0.4)) / 0.8), p: DOT.clone() });
+  return list;
+}
+
+function rawLook(t, cam) {
+  const dir = v3(0, 0, 0);
+  let focus = 0;
+  for (const { w, p } of aimTargets(t)) {
+    if (w <= 1e-6) continue;
+    dir.addScaledVector(p.clone().sub(cam).normalize(), w);
+    focus += w * p.distanceTo(cam);
+  }
+  dir.normalize();
+  const tLeave = wpT[I_POV + 2];                            // leaving the ray for the hero view
+  const k = smoother((t - tLeave) / (T_REST - tLeave));
+  return { look: slerpVec(dir, FINAL_LOOK, k), focus: focus * (1 - k) + DOT.distanceTo(CF) * k };
+}
+
+// precompute camera per frame, with the aim smoothed over ~0.3 s so nothing jerks
+const N_FRAMES = Math.round(DURATION * FPS) + 1;
+const camAt = [], focusAt = [], rawLooks = [];
+for (let f = 0; f < N_FRAMES; f++) {
+  const t = f / FPS;
+  const c = camTrack.at(t);
+  const { look, focus } = rawLook(t, c);
+  camAt.push(c); rawLooks.push(look); focusAt.push(focus);
+}
+const SIGMA = 0.3 * FPS;
+const looks = rawLooks.map((_, i) => {
+  const acc = v3(0, 0, 0);
+  for (let j = -Math.ceil(3 * SIGMA); j <= Math.ceil(3 * SIGMA); j++) {
+    const w = Math.exp(-0.5 * (j / SIGMA) ** 2);
+    acc.addScaledVector(rawLooks[Math.min(Math.max(i + j, 0), N_FRAMES - 1)], w);
+  }
+  return acc.normalize();
+});
+
+function sampleFrames(arr, t, lerpFn) {
+  const x = Math.min(Math.max(t * FPS, 0), N_FRAMES - 1);
+  const i = Math.floor(x), j = Math.min(i + 1, N_FRAMES - 1), k = x - i;
+  return lerpFn(arr[i], arr[j], k);
+}
+
+// everything the renderer needs at time t
+export function stateAt(t) {
+  const cam = sampleFrames(camAt, t, (a, b, k) => a.clone().lerp(b, k));
+  const look = sampleFrames(looks, t, (a, b, k) => a.clone().lerp(b, k).normalize());
+  const focus = sampleFrames(focusAt, t, (a, b, k) => a + (b - a) * k);
+  return {
+    t,
+    camera: { position: cam, target: cam.clone().add(look), focus,
+      // shallow depth of field while visiting rays (the others soften), deeper at the end
+      coc: ramp(t, 2.0, 3.0, 40, 70) - ramp(t, T_MERGE0, T_POV + 1, 0, 35) },
+    hub: {
+      position: HUB,
+      intensity: ramp(t, 0.0, 0.25, 0, 3.2) - ramp(t, 0.25, 1.2, 0, 1.8),
+      size: ramp(t, 0.0, 0.25, 0, 260) - ramp(t, 0.25, 1.2, 0, 120),
+    },
+    burst: {   // fine radial streaks when the hub ignites
+      length: 7 * smooth((t - 0.1) / 1.0) ** 0.7,
+      alpha: ramp(t, 0.1, 0.35, 0, 1) - ramp(t, 0.6, 1.9, 0, 1),
+    },
+    rays: RAYS.map((_, i) => rayState(i, t)),
+    dot: {     // an ordinary dot until the ray lands on it
+      position: DOT,
+      intensity: 0.25 + ramp(t, T_POV + 1.2, T_POV + 1.8, 0, 2.2),
+      size: 6 + ramp(t, T_POV + 1.2, T_POV + 1.8, 0, 190),
+    },
+  };
+}
+
+// for checks
+export const debug = { camAt, looks, focusAt, CF, FINAL_LOOK, DOT, HUB, N_FRAMES, wpT };

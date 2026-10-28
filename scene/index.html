@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Qboltz — The Answer</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 56.25vw; max-height: 100vh; max-width: 177.78vh; margin: auto;
+             position: absolute; inset: 0; }
+    #ui { position: fixed; left: 12px; bottom: 10px; color: #777; font: 12px/1.4 monospace; user-select: none; }
+  </style>
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/three.module.min.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="ui"></div>
+  <script type="module">
+    import { createLightScan } from './light-scan.js';
+
+    const scan = createLightScan(document.getElementById('c'));
+    window.QB = scan;   // used by render.mjs to step frame by frame
+
+    // ?capture: render only on request. Otherwise play in a loop (space: pause, ←/→: step).
+    if (!new URLSearchParams(location.search).has('capture')) {
+      const ui = document.getElementById('ui');
+      let t = 0, playing = true, last = performance.now();
+      addEventListener('keydown', (e) => {
+        if (e.code === 'Space') playing = !playing;
+        if (e.code === 'ArrowRight') t += 1 / scan.fps;
+        if (e.code === 'ArrowLeft') t -= 1 / scan.fps;
+      });
+      const tick = (now) => {
+        if (playing) t += (now - last) / 1000;
+        last = now;
+        t = ((t % scan.duration) + scan.duration) % scan.duration;
+        scan.renderAt(t);
+        ui.textContent = `${t.toFixed(2)} / ${scan.duration.toFixed(1)} s   space: pause   ←/→: step`;
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+    window.QB_READY = true;
+  </script>
+</body>
+</html>
