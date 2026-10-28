@@ -54,10 +54,43 @@ def c_hold_dir(t):
     az, el = c_hold(t)
     return (math.cos(el) * math.cos(az), math.cos(el) * math.sin(az), math.sin(el))
 
+# SCANNING motion, like a searchlight: each ray eases out of a hold, sweeps to a
+# new spot, eases to a stop, lingers briefly (still breathing a little), then
+# sweeps on. Every ray keeps its own rhythm, so they never move in lock-step.
+def _scan_keys(i):
+    rnd = random.Random(100 + i); r = RAYS[i]
+    az, el = math.radians(r["az"]), math.radians(r["el"])
+    t = -rnd.uniform(0.0, 1.2)                     # stagger the rhythms
+    keys = [(t, az, el)]
+    while t < SECONDS + 3:
+        dwell, sweep = rnd.uniform(0.25, 0.55), rnd.uniform(1.6, 2.6)
+        keys.append((t + dwell, az, el))           # linger
+        daz = math.radians(rnd.uniform(30, 60)) * rnd.choice((-1, 1))
+        az_n = math.radians(r["az"]) + max(-1.1, min(1.1, az + daz - math.radians(r["az"])))
+        el_n = math.radians(r["el"]) + math.radians(rnd.uniform(-22, 22))
+        t += dwell + sweep
+        keys.append((t, az_n, el_n))               # eased sweep to the next spot
+        az, el = az_n, el_n
+    return keys
+_SCAN = [_scan_keys(i) for i in range(len(RAYS))]
+
+def scan_angles(i, t):
+    K = _SCAN[i]
+    for a, b in zip(K, K[1:]):
+        if a[0] <= t <= b[0]:
+            u = sm((t - a[0]) / max(b[0] - a[0], 1e-6))
+            az, el = a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u
+            break
+    else:
+        az, el = K[-1][1], K[-1][2]
+    # a breath on top, so a lingering ray is never dead still
+    w = RAYS[i]["w"]; p = RAYS[i]["p"]
+    return (az + math.radians(2.0) * math.sin(w[0] * 2.2 * t + p[0]),
+            el + math.radians(1.5) * math.sin(w[2] * 2.2 * t + p[2]))
+
 def ray_angles(i, t):
-    r = RAYS[i]; w = [x * SWEEP for x in r["w"]]; p = r["p"]
-    az = math.radians(r["az"]) + AZ_AMP * (0.6 * math.sin(w[0] * t + p[0]) + 0.4 * math.sin(w[1] * t + p[1]))
-    el = math.radians(r["el"]) + EL_AMP * (0.55 * math.sin(w[2] * t + p[2]) + 0.45 * math.sin(w[3] * t + p[3]))
+    r = RAYS[i]
+    az, el = scan_angles(i, t)
     if r["name"] == "C":
         s = sm((t - C_SETTLE[0]) / (C_SETTLE[1] - C_SETTLE[0]))
         haz, hel = c_hold(t)
@@ -85,41 +118,46 @@ def _integrate(vel):
     return lambda t: out[min(int(round(t * FPS * 4)), len(out) - 1)]
 
 # ---------------------------------------------------------------- camera ----
-# 1) far ARC: 26 m out, a slow 70 deg arc, always facing the source.
-ORB_R, ORB_T0, ORB_T1, ORB_RAMP = 26.0, 0.0, 8.6, 2.2
+# One continuous move:
+#  1) ARC 0 -> 6.1 s: 26 m out, always facing the source, arcing toward the
+#     future beam's axis.
+#  2) SPIRAL IN 6.1 -> 7.9 s: the moment the rays start to fold, the camera keeps
+#     arcing AND dives in. The spiral lands on the beam's axis right at the source
+#     at 7.9 s -- the same frame the last ray folds in. One ray, and we are on it.
+#  3) RIDE 7.9 s -> end: out along the beam, braking to a glide ~1 m above it.
+T_DIVE, T_ON = MERGE_T0, MERGE_T1                   # the fold IS the dive
+ORB_R, ORB_RAMP = 26.0, 2.2
 ORB_H0, ORB_H1 = 5.0, 2.0
-_ORB = _integrate(lambda t: sm((t - ORB_T0 + 0.8) / ORB_RAMP) * (1 - sm((t - (ORB_T1 - ORB_RAMP)) / ORB_RAMP)))
-def orbit_angle(t): return ORB_A0 + ORB_SWEEP * _ORB(t) / _ORB(SECONDS)
+_ORB = _integrate(lambda t: sm((t + 0.8) / ORB_RAMP) * (1 - sm((t - (T_ON - ORB_RAMP)) / ORB_RAMP)))
+def orbit_angle(t): return ORB_A0 + ORB_SWEEP * _ORB(min(t, T_ON)) / _ORB(T_ON)
 
-# 2) WHOOSH: along the beam's line from the far side, through the source's glow,
-#    then brake to a cruise just above the beam. s = distance past the source.
-def _whoosh_v(t): return 16.0 * sm((t - 7.3) / 1.8) * (1.0 - 0.8 * sm((t - 9.8) / 1.4))
-_WH = _integrate(_whoosh_v)
-def whoosh_s(t): return -ORB_R + _WH(t)
-def w_whoosh(t): return sm((t - 7.2) / 1.4)
+V_ON = 14.0                                         # speed as we cross the source
+def dive_r(t):
+    """distance from the source during the spiral: cubic Hermite, leaves the arc
+    at rest radially and reaches the source at V_ON."""
+    if t <= T_DIVE: return ORB_R
+    T = T_ON - T_DIVE; u = min((t - T_DIVE) / T, 1.0)
+    return ORB_R * (2*u**3 - 3*u**2 + 1) - V_ON * T * (u**3 - u**2)
 
-def _bearing(az, dist, h):
-    return [HUB[0] + dist * math.cos(az), HUB[1] + dist * math.sin(az), HUB[2] + h]
+_RIDE = _integrate(lambda t: (3.0 + (V_ON - 3.0) * (1 - sm((t - T_ON) / 1.8))) if t >= T_ON else 0.0)
+def ride_s(t): return _RIDE(t)
 
 def cam_pos(t):
-    orb = _bearing(orbit_angle(t), ORB_R, lerp(ORB_H0, ORB_H1, sm(t / 8.0)))
-    s = whoosh_s(t); az, el = c_hold(t)
-    # the path comes in along the arc's bearing and bends through the source onto
-    # the beam's line, so the camera ends dead above the beam
-    b = sm((s + 3.0) / 6.0); az_in = ORB_END + math.pi
-    hx_ = s * ((1 - b) * math.cos(az_in) + b * math.cos(az))
-    hy_ = s * ((1 - b) * math.sin(az_in) + b * math.sin(az))
-    h = (lerp(ORB_H1, 0.45, sm((s + 26.0) / 24.0))           # sink to skim just over the source
-         + 0.55 * sm(s / 3.0)                                 # then ride ~1 m above the beam
-         + max(s, 0.0) * math.tan(el))
-    wh = [HUB[0] + hx_, HUB[1] + hy_, HUB[2] + h]
-    w = w_whoosh(t)
-    return [lerp(orb[k], wh[k], w) for k in range(3)]
+    az_b, el = c_hold(t)
+    if t < T_ON:
+        a = orbit_angle(t); r = dive_r(t)
+        u = 0.0 if t <= T_DIVE else (t - T_DIVE) / (T_ON - T_DIVE)
+        h = lerp(lerp(ORB_H0, ORB_H1, sm(t / T_DIVE)), 0.45, sm(u))   # drop to skim the source
+        return [HUB[0] + r * math.cos(a), HUB[1] + r * math.sin(a), HUB[2] + h]
+    s = ride_s(t)
+    h = 0.45 + 0.55 * sm(s / 3.0) + s * math.tan(el)              # settle ~1 m above the beam
+    return [HUB[0] + s * math.cos(az_b), HUB[1] + s * math.sin(az_b), HUB[2] + h]
 
 def attention(t):
-    d = c_hold_dir(t); r = max(whoosh_s(t), 0.0) + 8.0
+    # the source while we arc; then a point out along the beam, 8 m ahead of us
+    d = c_hold_dir(t); r = (ride_s(t) if t >= T_ON else 0.0) + 8.0
     p = [HUB[k] + d[k] * r for k in range(3)]
-    w = w_whoosh(t)
+    w = sm((t - T_DIVE) / (T_ON - T_DIVE))
     return [lerp(HUB[k], p[k], w) for k in range(3)]
 
 ATT = 1.0
@@ -128,8 +166,8 @@ def subj_wp(t):
 
 STEP = 0.25
 TS = [round(k * STEP, 3) for k in range(int(SECONDS / STEP) + 1)]
-def LENS(t):          # distant source framed with its rays -> wide whoosh -> ride
-    return lerp(30.0, lerp(18.0, 20.0, sm((t - 10.5) / 2.0)), sm((t - 7.8) / 1.6))
+def LENS(t):          # distant source framed with its rays -> wide dive -> ride
+    return lerp(30.0, lerp(18.0, 20.0, sm((t - 9.0) / 2.5)), sm((t - T_DIVE) / (T_ON - T_DIVE)))
 
 SHOT = {
   "name": "source_whoosh", "fps": FPS, "seconds": SECONDS,
@@ -202,7 +240,7 @@ if __name__ == "__main__":
                      # a cone of light: far half-width fixed, length animated
                      "cone": round(CONE_END_HW * (1.0 if r["name"] == "C" else 0.97), 3),
                      # once folded in, the other five vanish: only ONE cone remains
-                     **({} if r["name"] == "C" else {"merged_at": int(round(MERGE_T1 * FPS))}),
+                     **({} if r["name"] == "C" else {"merged_at": int(round(MERGE_T1 * FPS)) - 2}),
                      "length": RAY_LEN,
                      "az": [round(ray_angles(i, f / FPS)[0], 5) for f in range(NF)],
                      "el": [round(ray_angles(i, f / FPS)[1], 5) for f in range(NF)],
