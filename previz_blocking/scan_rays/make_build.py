@@ -35,9 +35,9 @@ PV.reset(fps=R["fps"], seconds=R["frames"] / R["fps"])
 PV.checker()                                   # no place named -> the void
 PV.sun()
 
-# the hub: one bright block the six rays leave from
+# no hub object: the rays leave from one bare point in the air -- a block there
+# would hand the video model an object nobody wants in the shot
 hx, hy, hz = R["hub"]
-PV.slab("SET_hub", (0.6, 0.6, 0.6), (hx, hy, hz), "white", emit=4.0)
 
 # six rays: long thin emissive slabs pivoting on the hub, base on the pivot,
 # local +Z aimed at (az, el) -> euler XYZ = (pi/2 - el, 0, az + pi/2)
