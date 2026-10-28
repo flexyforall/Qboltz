@@ -45,3 +45,15 @@ blk.hide_render = True
 blk.hide_set(True)
 
 print(PV.viewport_ready())
+
+# fill every 3D view with the camera frame (View -> Frame Camera Bounds)
+for w in bpy.context.window_manager.windows:
+    for a in w.screen.areas:
+        if a.type != 'VIEW_3D': continue
+        a.spaces.active.show_gizmo = True     # keep the camera / zoom / pan buttons on the right
+        rg = next((r for r in a.regions if r.type == 'WINDOW'), None)
+        try:
+            with bpy.context.temp_override(window=w, screen=w.screen, area=a, region=rg):
+                bpy.ops.view3d.view_center_camera()
+        except Exception as e:
+            print("frame camera bounds skipped:", e)
