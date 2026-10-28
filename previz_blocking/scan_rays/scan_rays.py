@@ -1,4 +1,4 @@
-"""scan_rays (v2, 12 s) -- six searching light rays from one hub. The camera flies
+"""scan_rays (v2, 13 s) -- six searching light rays from one hub. The camera flies
 in and settles level with the hub, arcs round it to the right -- always facing it --
 and ends opposite ray C. Every ray folds into C, the camera passes over the hub
 and flies on above the one beam. v1 (21 s, half orbit): ../scan_rays_v1_21s/
@@ -11,7 +11,7 @@ running out along ray C. It is hidden in the build.
 """
 import math, json, os
 
-FPS, SECONDS = 24, 12.0
+FPS, SECONDS = 24, 13.0
 NF = int(round(FPS * SECONDS))
 HUB = (0.0, 0.0, 1.2)
 RAY_LEN = 150.0
