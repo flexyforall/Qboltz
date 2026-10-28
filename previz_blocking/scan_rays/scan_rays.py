@@ -174,7 +174,7 @@ _PULSE = _integrate(lambda t: (PULSE_V0 + (PULSE_V1 - PULSE_V0) * sm((t - PULSE_
 # A mote LIGHTS UP while a beam passes through it -- that is the "scanning".
 # They are also the only parallax the camera has now that the floor is gone.
 import random
-N_MOTES, MOTE_LIT_R, MOTE_CAM_CLEAR = 7000, 1.0, 0.9
+N_MOTES, MOTE_LIT_R, MOTE_CAM_CLEAR = 7000, 1.0, 2.5   # 2.5 m: no big near-lens discs, sizes read even
 
 def _ray_dist(p, i, t):
     d = ray_dir(i, t); v = [p[k] - HUB[k] for k in range(3)]
@@ -246,7 +246,8 @@ def motes():
         D[(U < 0) | (U > RAY_LEN)] = 99.0
         x = np.clip(D.min(axis=0) / MOTE_LIT_R, 0, 1)
         g = 1.0 - x * x * x * (x * (6 * x - 15) + 10)
-        m["r"] = round(rnd.uniform(0.010, 0.025), 4); m["glow"] = [round(float(v), 3) for v in g]
+        m["r"] = round(rnd.uniform(0.015, 0.018), 4)   # one size of dust
+        m["glow"] = [round(float(v), 3) for v in g]
         out.append(m)
     return out
 
