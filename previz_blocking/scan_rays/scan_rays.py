@@ -86,6 +86,9 @@ def _frame(az, u, v, h):
     return [HUB[0] + u * math.cos(az) - v * math.sin(az),
             HUB[1] + u * math.sin(az) + v * math.cos(az), HUB[2] + h]
 
+OPEN_T, OPEN_DIST = 5.6, 6.6          # fly-in: seconds, metres of approach
+OPEN_H0, OPEN_H1 = 3.6, 0.25         # height above the hub: start -> arrival
+
 def cam_pos(t):
     wh, wa, wb, wc = blend_w(t)
     azA, _ = ray_angles(IA, t); azB, _ = ray_angles(IB, t); azC, elC = ray_angles(IC, t)
@@ -93,9 +96,12 @@ def cam_pos(t):
     # "breath": the camera eases back out between one ray and the next, which
     # is what keeps the hand-off a pan instead of a whip
     br = 4.0 * wa * wb + 3.0 * wh * wa
-    P = [_frame(opn, 3.9 - 0.12 * t, 0.0, 2.5),             # high, before the hub
-         _frame(azA, 1.6, -3.3 - 1.6 * br, 1.7 + 0.6 * br),  # beside ray A, looking out
-         _frame(azB, 1.8, -3.1 - 1.6 * br, 1.4 + 0.6 * br),  # beside ray B
+    # open: fly in from high and far, settle level with the hub (ease-out, so
+    # the camera arrives already moving -- never starts from a dead stop)
+    ap = (1.0 - min(t / OPEN_T, 1.0)) ** 2
+    P = [_frame(opn, 3.4 + OPEN_DIST * ap, 0.0, OPEN_H1 + (OPEN_H0 - OPEN_H1) * ap),
+         _frame(azA, 1.6, -3.3 - 1.6 * br, 0.9 + 0.6 * br),  # beside ray A, about level
+         _frame(azB, 1.8, -3.1 - 1.6 * br, 0.7 + 0.6 * br),  # beside ray B, about level
          _frame(azC, ride_s(t), -1.1,                       # riding along C
                 0.75 + max(ride_s(t), 0) * math.tan(elC))]
     return [sum(w * p[k] for w, p in zip((wh, wa, wb, wc), P)) for k in range(3)]
@@ -114,7 +120,7 @@ STEP = 0.25
 TS = [round(k * STEP, 3) for k in range(int(SECONDS / STEP) + 1)]
 def LENS(t):                       # wide open, push on the close-ins, wide ride
     wh, wa, wb, wc = blend_w(t)
-    return wh * 24 + (wa + wb) * 38 + wc * lerp(34, 20, sm((t - 10.4) / 4.0))
+    return wh * 24 + (wa + wb) * 38 + wc * lerp(28, 20, sm((t - 10.4) / 4.0))
 
 SHOT = {
   "name": "scan_rays", "fps": FPS, "seconds": SECONDS,
