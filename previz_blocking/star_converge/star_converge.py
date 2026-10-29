@@ -16,7 +16,7 @@ Lengths are metres in the source plane (12 m from the lens, 35 mm:
 import math, json, os, random
 
 FPS = 24
-NF = 170
+NF = 170 + 48                  # reference length + a 2 s hold on the final state
 SECONDS = NF / FPS
 HUB = (0.0, 0.0, 0.0)
 FAR = 60.0                          # a "full" half-line, well past the frame edge
