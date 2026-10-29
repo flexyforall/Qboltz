@@ -113,9 +113,9 @@ CORE_R = [(0, 0.25), (140, 0.25), (144, 0.32), (152, 0.42), (160, 0.52), (169, 0
 # radar sweep: one full turn round the source, braking smoothly so that it
 # comes to rest exactly ON the last remaining line (cone axis = 190 deg) at
 # WIDE_LAND -- the moment only one line is left -- and then fades out
-WIDE_START, WIDE_TURNS, WIDE_BRAKE, WIDE_LAND = 170.0, 1, 80, 150
+WIDE_START, WIDE_TURNS, WIDE_BRAKE, WIDE_LAND = 170.0, 1.5, 80, 150   # 1.5 turns: lands on the up-right half
 FINAL_ANGLE = 190.0
-WIDE_AXIS_TRIM = -5.0     # the pyramid's on-screen axis sits ~5 deg below its roty axis
+WIDE_AXIS_TRIM = -0.5     # measured on screen so the cone axis sits on the up-right half
 def wide_edge(f):
     T = WIDE_LAND
     total = WIDE_TURNS * 360.0 + (FINAL_ANGLE - WIDE_HALF - WIDE_START + WIDE_AXIS_TRIM)
