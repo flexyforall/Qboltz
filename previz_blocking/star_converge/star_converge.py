@@ -131,6 +131,10 @@ def line_angle(L, f): return track_smooth(L["keys"], f)
 # --------------------------------------------------------------- particles --
 # faint dotted elliptical rings round the source, turning slowly
 RING_AXIS = (0.18, -0.55, 1.0)
+# the dotted rings move in WAVES: ripples run outward from the source (the rings
+# breathe in and out one after another) and roll round each ring (it undulates
+# out of its plane)
+RING_WAVE = {"wavelength": 6.0, "period": 3.0, "amp_r": 0.35, "amp_n": 0.5, "lobes": 3}
 RINGS = [(3.0, 110), (5.0, 160), (7.0, 210), (9.5, 260), (12.0, 300)]
 
 def _unit(v):
@@ -192,6 +196,7 @@ if __name__ == "__main__":
                  "roty": [round(math.pi / 2 - t, 5) for t in th_w],
                  "alpha": [round(track_lin(WIDE_ALPHA, f), 3) for f in range(NF)]})
     out = {"fps": FPS, "frames": NF, "hub": HUB, "length": FAR, "mote_motion": "rings",
+           "ring_wave": RING_WAVE,
            "rays": rays, "motes": motes(),
            "core": {"r": [round(track(CORE_R, f), 3) for f in range(NF)]}}
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rays.json")

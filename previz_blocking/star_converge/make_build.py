@@ -168,14 +168,27 @@ for i, mo in enumerate(R.get("motes", [])):
     cb = PV._cbag(o, "ACT_mote_%%03d" %% i, 'OBJECT', o.name)
     if R.get("mote_motion") == "rings":      # orbit on a tilted ring round the source
         p0, ax, w = mo["p0"], mo["axis"], mo["w"]
-        fr = list(range(1, NF + 1, 4)) + ([NF] if (NF - 1) %% 4 else [])
+        fr = list(range(1, NF + 1, 2)) + ([NF] if (NF - 1) %% 2 else [])
         co = {0: [], 1: [], 2: []}
         for f in fr:
             a_ = w * (f - 1) / R["fps"]; c, s_ = math.cos(a_), math.sin(a_)
             kxp = (ax[1]*p0[2]-ax[2]*p0[1], ax[2]*p0[0]-ax[0]*p0[2], ax[0]*p0[1]-ax[1]*p0[0])
             kp = ax[0]*p0[0] + ax[1]*p0[1] + ax[2]*p0[2]
+            P = [p0[k]*c + kxp[k]*s_ + ax[k]*kp*(1-c) for k in range(3)]
+            W = R.get("ring_wave")
+            if W:                            # waves: ripples run outward + roll round each ring
+                t = (f - 1) / R["fps"]
+                pn = sum(P[k] * ax[k] for k in range(3))
+                u = [P[k] - pn * ax[k] for k in range(3)]; rr = math.sqrt(sum(x * x for x in u)) or 1e-6
+                ua = [ax[1], -ax[0], 0.0]; la = math.sqrt(ua[0]**2 + ua[1]**2) or 1e-6; ua = [x / la for x in ua]
+                ub = [ax[1]*ua[2]-ax[2]*ua[1], ax[2]*ua[0]-ax[0]*ua[2], ax[0]*ua[1]-ax[1]*ua[0]]
+                phi = math.atan2(sum(u[k]*ub[k] for k in range(3)), sum(u[k]*ua[k] for k in range(3)))
+                ph = 2 * math.pi * (rr / W["wavelength"] - t / W["period"])
+                dr = W["amp_r"] * math.sin(ph)
+                dz = W["amp_n"] * math.sin(ph + W["lobes"] * phi)
+                P = [P[k] + u[k] / rr * dr + ax[k] * dz for k in range(3)]
             for k, h0 in enumerate((hx, hy, hz)):
-                co[k] += [f, h0 + p0[k]*c + kxp[k]*s_ + ax[k]*kp*(1-c)]
+                co[k] += [f, h0 + P[k]]
         for k in range(3):
             fc = cb.fcurves.new("location", index=k)
             fc.keyframe_points.add(len(fr))
