@@ -34,6 +34,14 @@ RAYS = [
     dict(name="D", az= 90, color="yellow", w=(0.92, 0.67, 0.58, 1.17), p=(1.75, 3.44, 1.17, 5.64), el=30),
     dict(name="E", az=210, color="yellow", w=(0.57, 1.03, 0.89, 0.73), p=(5.2, 4.82, 6.19, 0.63),  el=-25),
     dict(name="F", az=270, color="yellow", w=(1.09, 0.79, 0.66, 0.84), p=(3.88, 5.67, 0.45, 6.21), el=10),
+    # six more, filling the gaps above and below so light leaves the source in
+    # every direction, as in the reference
+    dict(name="G", az=  0, color="blue",   w=(0.77, 1.02, 0.61, 0.93), p=(0.9, 2.7, 4.1, 1.6),  el=-40),
+    dict(name="H", az= 60, color="purple", w=(0.95, 0.71, 0.84, 0.58), p=(3.3, 0.2, 2.4, 5.1),  el=45),
+    dict(name="I", az=120, color="yellow", w=(0.62, 1.15, 0.72, 1.01), p=(5.6, 4.4, 0.7, 2.9),  el=-10),
+    dict(name="J", az=180, color="blue",   w=(1.04, 0.66, 0.97, 0.79), p=(2.1, 1.1, 3.6, 4.4),  el=35),
+    dict(name="K", az=240, color="purple", w=(0.69, 0.88, 1.12, 0.67), p=(4.7, 5.9, 1.3, 0.3),  el=20),
+    dict(name="L", az=300, color="yellow", w=(0.86, 1.08, 0.55, 0.91), p=(1.4, 3.2, 5.5, 3.8),  el=-35),
 ]
 IC = 2
 AZ_AMP, EL_AMP, SWEEP = math.radians(45), math.radians(22), 1.6
