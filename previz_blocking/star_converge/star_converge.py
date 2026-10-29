@@ -74,27 +74,27 @@ def aim_z(f): return -(0.5 - track_smooth(SRC_Y, f) / 742) * 2 * HALF_H
 # keys are (frame, angle of the half that ends on the LEFT/lower-left side).
 LINES = [
     # L1: rotates CCW onto the final line
-    dict(name="L1", color="red",
+    dict(name="L1", color="white",  # was red
          keys=[(0, 138), (44, 148), (65, 157), (80, 168), (88, 171), (96, 173.5), (104, 175.5),
                (112, 178.5), (120, 181.5), (128, 183.5), (136, 186), (140, 187.5), (144, 189.5),
                (148, 190), (169, 190)],
          alpha=[(0, 1.0)]),
     # L2: its upper-right half sweeps clockwise 63 -> 10; lower-left 243 -> 190
-    dict(name="L2", color="yellow",
+    dict(name="L2", color="white",  # was yellow
          keys=[(0, 243), (24, 232), (48, 217), (72, 210.5), (80, 212), (88, 209), (96, 205),
                (104, 200), (112, 196.5), (116, 194), (120, 192.5), (124, 191.5), (128, 190.5),
                (136, 190), (144, 190), (169, 190)],
          alpha=[(0, 1.0), (146, 1.0), (152, 0.0)]),
     # L3: stays near 126/306 and fades out
-    dict(name="L3", color="cyan",
+    dict(name="L3", color="white",  # was cyan
          keys=[(0, 126), (33, 116), (50, 112), (95, 115), (112, 117), (169, 117)],
          alpha=[(0, 1.0), (100, 1.0), (122, 0.0)]),
     # L4: near-horizontal, drifts and joins the final line
-    dict(name="L4", color="green",
+    dict(name="L4", color="white",  # was green
          keys=[(0, 174), (17, 186), (27, 180), (41, 178), (60, 181), (84, 185), (100, 188), (118, 190), (169, 190)],
          alpha=[(0, 1.0), (88, 1.0), (96, 0.0)]),
     # L5: a short-lived line that sweeps 93 -> 45 early on
-    dict(name="L5", color="purple",
+    dict(name="L5", color="white",  # was purple
          keys=[(0, 100), (12, 93), (37, 55), (52, 45), (169, 45)],
          alpha=[(0, 0.0), (10, 0.0), (16, 1.0), (40, 1.0), (56, 0.0)]),
 ]
@@ -139,6 +139,21 @@ RINGS = [(3.0, 110), (5.0, 160), (7.0, 210), (9.5, 260), (12.0, 300)]
 
 def _unit(v):
     L = math.sqrt(sum(x * x for x in v)); return [x / L for x in v]
+
+# the background is a flat field of fine dust behind the source. Two slow
+# travelling waves slide the grains back and forth along their direction, so
+# the dust bunches into dense curved bands with sparse gaps that drift slowly
+# across the frame (like wind ripples in sand). Slow: a crest moves ~1.2 m/s,
+# each grain sways once every ~4 s.
+DUST = {"y": 6.0, "x": (-16.0, 8.0), "z": (-9.0, 5.0), "n": 3200, "r": (0.02, 0.032),
+        "waves": [{"c": (-28.0, -20.0), "wavelength": 5.0, "speed": 1.2, "amp": 0.78},
+                  {"c": (22.0, -26.0), "wavelength": 8.0, "speed": 0.8, "amp": 0.3}]}
+
+def dust():
+    rnd = random.Random(11)
+    return [{"p0": [round(rnd.uniform(*DUST["x"]), 3), DUST["y"] + round(rnd.gauss(0, 0.15), 3),
+                    round(rnd.uniform(*DUST["z"]), 3)],
+             "r": round(rnd.uniform(*DUST["r"]), 4)} for _ in range(DUST["n"])]
 
 def motes():
     rnd = random.Random(9)
@@ -195,9 +210,9 @@ if __name__ == "__main__":
                  "cone": round(40.0 * math.tan(math.radians(WIDE_HALF)), 3),
                  "roty": [round(math.pi / 2 - t, 5) for t in th_w],
                  "alpha": [round(track_lin(WIDE_ALPHA, f), 3) for f in range(NF)]})
-    out = {"fps": FPS, "frames": NF, "hub": HUB, "length": FAR, "mote_motion": "rings",
-           "ring_wave": RING_WAVE,
-           "rays": rays, "motes": motes(),
+    out = {"fps": FPS, "frames": NF, "hub": HUB, "length": FAR, "mote_motion": "dust",
+           "dust": {"waves": DUST["waves"]},
+           "rays": rays, "motes": dust(),
            "core": {"r": [round(track(CORE_R, f), 3) for f in range(NF)]}}
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rays.json")
     json.dump(out, open(p, "w")); print("rays ->", p)

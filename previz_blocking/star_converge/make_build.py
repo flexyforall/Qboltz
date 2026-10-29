@@ -14,7 +14,7 @@ bake = json.dumps(rnd(json.load(open(os.path.join(H, "bake.json")))), separators
 _R = json.load(open(os.path.join(H, "rays.json")))
 for _m in _R.get("motes", []):
     # keep only the frames where the mote is lit, plus the dark frame either side
-    g = _m.pop("glow"); n = len(g)
+    g = _m.pop("glow", []); n = len(g)
     _m["gk"] = [[f, g[f]] for f in range(n)
                 if g[f] > 0 or (f and g[f - 1] > 0) or (f + 1 < n and g[f + 1] > 0)]
 rays = json.dumps(rnd(_R), separators=(",", ":"))
@@ -189,6 +189,23 @@ for i, mo in enumerate(R.get("motes", [])):
                 P = [P[k] + u[k] / rr * dr + ax[k] * dz for k in range(3)]
             for k, h0 in enumerate((hx, hy, hz)):
                 co[k] += [f, h0 + P[k]]
+        for k in range(3):
+            fc = cb.fcurves.new("location", index=k)
+            fc.keyframe_points.add(len(fr))
+            fc.keyframe_points.foreach_set("co", co[k])
+            fc.keyframe_points.foreach_set("interpolation", [1] * len(fr)); fc.update()
+    elif R.get("mote_motion") == "dust":     # flat dust field; slow travelling waves bunch it into bands
+        D = R["dust"]; p0 = mo["p0"]
+        fr = list(range(1, NF + 1, 4)) + ([NF] if (NF - 1) %% 4 else [])
+        co = {0: [], 1: [], 2: []}
+        for f in fr:
+            t = (f - 1) / R["fps"]; x, z = p0[0], p0[2]
+            for W in D["waves"]:                 # longitudinal: grains slide along the wave direction
+                dx, dz = p0[0] - W["c"][0], p0[2] - W["c"][1]
+                d = math.sqrt(dx * dx + dz * dz) or 1e-6
+                a = W["amp"] * math.sin(2 * math.pi * (d - W["speed"] * t) / W["wavelength"])
+                x += dx / d * a; z += dz / d * a
+            for k, v_ in enumerate((x, p0[1], z)): co[k] += [f, v_]
         for k in range(3):
             fc = cb.fcurves.new("location", index=k)
             fc.keyframe_points.add(len(fr))
