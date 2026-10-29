@@ -110,11 +110,16 @@ RIGHT_LEN = [(0, FAR), (128, FAR), (130, 4.0), (132, 3.3), (136, 1.8), (140, 0.9
 CORE_R = [(0, 0.25), (140, 0.25), (144, 0.32), (152, 0.42), (160, 0.52), (169, 0.52)]
 
 # the wide soft cone: its sharp upper edge turns 170 -> 192 deg and it fades
-# radar sweep: steady full turns round the source for the whole shot, no
-# braking; the last frame still lands on the final line's side (192 deg)
-WIDE_START, WIDE_TURNS = 170.0, 3
+# radar sweep: a full turn round the source at a steady, slow speed, then it
+# brakes smoothly from WIDE_BRAKE and comes to rest on the final line's side
+# (192 deg) at the last frame
+WIDE_START, WIDE_TURNS, WIDE_BRAKE = 170.0, 1, 80
 def wide_edge(f):
-    return WIDE_START + (WIDE_TURNS * 360.0 + 22.0) * f / (NF - 1)
+    T = NF - 1; total = WIDE_TURNS * 360.0 + 22.0
+    v = total / (WIDE_BRAKE + (T - WIDE_BRAKE) / 2)          # deg/frame while cruising
+    if f <= WIDE_BRAKE: return WIDE_START + v * f
+    t = min(f, T) - WIDE_BRAKE
+    return WIDE_START + v * WIDE_BRAKE + v * t - v * t * t / (2 * (T - WIDE_BRAKE))
 WIDE_HALF = 15.0
 WIDE_ALPHA = [(0, 0.32), (120, 0.30), (150, 0.14), (169, 0.11)]
 
