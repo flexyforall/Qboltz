@@ -110,7 +110,14 @@ RIGHT_LEN = [(0, FAR), (128, FAR), (130, 4.0), (132, 3.3), (136, 1.8), (140, 0.9
 CORE_R = [(0, 0.25), (140, 0.25), (144, 0.32), (152, 0.42), (160, 0.52), (169, 0.52)]
 
 # the wide soft cone: its sharp upper edge turns 170 -> 192 deg and it fades
-WIDE_EDGE = [(0, 170), (40, 180), (80, 185), (120, 190), (169, 192)]
+# radar sweep: one full turn round the source at a steady speed, then it
+# brakes and comes to rest on the final line's side (192 deg) at the last frame
+WIDE_START, WIDE_TURN, WIDE_BRAKE = 170.0, 382.0, 120     # deg, deg, frame
+def wide_edge(f):
+    T = NF - 1; v = WIDE_TURN / (WIDE_BRAKE + (T - WIDE_BRAKE) / 2)   # deg/frame
+    if f <= WIDE_BRAKE: return WIDE_START + v * f
+    t = min(f, T) - WIDE_BRAKE
+    return WIDE_START + v * WIDE_BRAKE + v * t - v * t * t / (2 * (T - WIDE_BRAKE))
 WIDE_HALF = 15.0
 WIDE_ALPHA = [(0, 0.32), (120, 0.30), (150, 0.14), (169, 0.11)]
 
@@ -174,7 +181,7 @@ if __name__ == "__main__":
                 ray["taper"] = True              # the final line thins out to its tip, like the ref
                 ray["width"] = 0.09
             rays.append(ray)
-    th_w = [math.radians(track(WIDE_EDGE, f) + WIDE_HALF) for f in range(NF)]
+    th_w = [math.radians(wide_edge(f) + WIDE_HALF) for f in range(NF)]
     rays.append({"name": "WIDE", "color": "blue", "length": 40.0,
                  "cone": round(40.0 * math.tan(math.radians(WIDE_HALF)), 3),
                  "roty": [round(math.pi / 2 - t, 5) for t in th_w],
