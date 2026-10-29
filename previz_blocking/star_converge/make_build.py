@@ -84,11 +84,16 @@ for r in R["rays"]:
         o = PV.slab("SET_ray_" + r["name"], (r.get("width", 0.10), r.get("width", 0.10),
                     r.get("length", R["length"])), (hx, hy, hz),
                     r["color"], emit=6.0, base=True)
-    o.color = (*PV.PALETTE[r["color"]], 0.3 if r.get("cone") else 1.0)
+    o.color = (*PV.PALETTE[r["color"]], (r["alpha"][0] if "alpha" in r else (0.3 if r.get("cone") else 1.0)))
     o.rotation_mode = 'XYZ'
-    ch = {("rotation_euler", 0): [math.pi / 2 - e for e in r["el"]],
-          ("rotation_euler", 1): [0.0] * len(r["el"]),
-          ("rotation_euler", 2): [a + math.pi / 2 for a in r["az"]]}
+    if "roty" in r:                          # flat: the ray turns in the picture plane
+        n_ = len(r["roty"])
+        ch = {("rotation_euler", 0): [0.0] * n_, ("rotation_euler", 1): r["roty"],
+              ("rotation_euler", 2): [0.0] * n_}
+    else:
+        ch = {("rotation_euler", 0): [math.pi / 2 - e for e in r["el"]],
+              ("rotation_euler", 1): [0.0] * len(r["el"]),
+              ("rotation_euler", 2): [a + math.pi / 2 for a in r["az"]]}
     if "len" in r:                           # rays reach SCAN length, then stretch far away
         ch[("scale", 2)] = [L / r.get("length", R["length"]) for L in r["len"]]
     if "alpha" in r:                         # the wide cone dims as the star takes over
