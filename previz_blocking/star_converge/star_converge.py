@@ -110,18 +110,21 @@ RIGHT_LEN = [(0, FAR), (128, FAR), (130, 4.0), (132, 3.3), (136, 1.8), (140, 0.9
 CORE_R = [(0, 0.25), (140, 0.25), (144, 0.32), (152, 0.42), (160, 0.52), (169, 0.52)]
 
 # the wide soft cone: its sharp upper edge turns 170 -> 192 deg and it fades
-# radar sweep: a full turn round the source at a steady, slow speed, then it
-# brakes smoothly from WIDE_BRAKE and comes to rest on the final line's side
-# (192 deg) at the last frame
-WIDE_START, WIDE_TURNS, WIDE_BRAKE = 170.0, 1, 80
+# radar sweep: one full turn round the source, braking smoothly so that it
+# comes to rest exactly ON the last remaining line (cone axis = 190 deg) at
+# WIDE_LAND -- the moment only one line is left -- and then fades out
+WIDE_START, WIDE_TURNS, WIDE_BRAKE, WIDE_LAND = 170.0, 1, 80, 150
+FINAL_ANGLE = 190.0
+WIDE_AXIS_TRIM = -5.0     # the pyramid's on-screen axis sits ~5 deg below its roty axis
 def wide_edge(f):
-    T = NF - 1; total = WIDE_TURNS * 360.0 + 22.0
+    T = WIDE_LAND
+    total = WIDE_TURNS * 360.0 + (FINAL_ANGLE - WIDE_HALF - WIDE_START + WIDE_AXIS_TRIM)
     v = total / (WIDE_BRAKE + (T - WIDE_BRAKE) / 2)          # deg/frame while cruising
     if f <= WIDE_BRAKE: return WIDE_START + v * f
     t = min(f, T) - WIDE_BRAKE
     return WIDE_START + v * WIDE_BRAKE + v * t - v * t * t / (2 * (T - WIDE_BRAKE))
 WIDE_HALF = 15.0
-WIDE_ALPHA = [(0, 0.32), (120, 0.30), (150, 0.14), (169, 0.11)]
+WIDE_ALPHA = [(0, 0.32), (120, 0.30), (WIDE_LAND, 0.26), (WIDE_LAND + 14, 0.0), (169, 0.0)]
 
 def line_angle(L, f): return track_smooth(L["keys"], f)
 
