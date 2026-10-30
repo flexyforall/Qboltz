@@ -45,7 +45,7 @@ WIDE_M = tuple(round((SAT[k] * 0.55 + HARBOR[k] * 0.45), 3) for k in range(3))  
 
 # -------------------------------------------------------- events (seconds) --
 EV = dict(beam_up=(6.0, 7.0), beam_off=(8.6, 9.2),
-          card1=(6.4, 9.0),
+          card1=(7.2, 9.2),               # only once the beam has reached the satellite
           card2=(9.4, 14.4), st_intent=10.0, st_plan=11.3, st_guard=12.6,
           hex_on=15.8, scan=(16.4, 20.2), cone=(16.0, 20.6),
           card3=(16.4, 20.4))
@@ -98,7 +98,8 @@ SHOT = {
     (0.0,  "back of the empty mission-control room, already flying in; giant video wall ahead, satellite over Earth on the centre screen"),
     (1.5,  "the centre screen fills the frame"),
     (3.0,  "through the screen: open space, Earth below, satellite ahead"),
-    (6.0,  "a signal beam rises from Earth to the satellite; card: Image the harbor at first light."),
+    (6.0,  "a signal beam rises from Earth to the satellite"),
+    (7.2,  "the beam has arrived; card: Image the harbor at first light."),
     (9.0,  "close-up of the satellite, orbit; card ORCA ONBOARD"),
     (10.0, "status: Intent received"), (11.3, "status: Planning"), (12.6, "status: Guardrails cleared"),
     (14.5, "pull out to wide"),
