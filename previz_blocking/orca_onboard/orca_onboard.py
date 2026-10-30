@@ -1,4 +1,4 @@
-"""orca_onboard -- hero film blocking, 35 s, 16:9, no sound. ONE continuous take.
+"""orca_onboard -- hero film blocking, 36 s, 16:9, no sound. ONE continuous take.
 Fast and smooth: nothing lingers.
 
   0-3     fly-in over the console tiers of the mission-control room and INTO the
@@ -9,7 +9,7 @@ Fast and smooth: nothing lingers.
           Intent received -> Planning -> Guardrails cleared
   17-24.5 wide: satellite above Earth, hexagon imaging zone scans the harbor;
           status Executing
-  24.5-35 pull back: out of space, back through the screen -- space is a picture
+  24.5-36 pull back: out of space, back through the screen -- space is a picture
           on the wall again -- and we stand at the back of the same empty room
 
 The centre screen is a real OPENING in the video wall; the space set sits behind
@@ -22,7 +22,7 @@ Rig: crane (big smooth arcs), speed ceiling raised for the space legs.
 """
 import json, math, os
 
-FPS, SECONDS = 24, 35
+FPS, SECONDS = 24, 36
 NF = FPS * SECONDS
 
 # ------------------------------------------------------------------ room ----
@@ -67,7 +67,7 @@ SHOT = {
     # hold keys either side of every stop: Catmull-Rom overshoots a lone key
     "waypoints": [(0.0, *S), (1.0, *S), (4.2, *SAT), (5.2, *SAT), (16.0, *SAT), (17.0, *SAT),
                   (20.0, *WIDE_M), (21.0, *WIDE_M), (23.5, *WIDE_M), (24.5, *WIDE_M),
-                  (29.0, *SAT), (30.5, *SAT), (32.8, *S), (33.8, *S), (35.0, *S)]},
+                  (29.0, *SAT), (30.5, *SAT), (32.8, *S), (33.8, *S), (36.0, *S)]},
   "shots": [{"t0": 0.0, "t1": SECONDS, "name": "one_take", "camera": {
       "aim_distance": 6.0, "subject_smooth": 12, "lens_smooth": 10,
       "waypoints": [
@@ -89,8 +89,10 @@ SHOT = {
         {"t": 27.0, "pos": [26.0, 12.0, 7.0], "lens": 29, "aim": [0, 0, 0]},
         {"t": 29.0, "pos": [8.0, 8.0, 6.0], "lens": 30, "aim": [0, 0, 0]},
         {"t": 30.3, "pos": [0.0, 3.0, 4.5], "lens": 30, "aim": [0, 0, 0]},
-        {"t": 32.3, "pos": [0.0, -8.0, 4.45], "lens": 30, "aim": [0, 0, 0]},
-        {"t": 35.0, "pos": [0.0, -12.2, 4.5], "lens": 30, "aim": [0, 0, 0]},
+        {"t": 32.3, "pos": [0.0, -8.6, 4.45], "lens": 30, "aim": [0, 0, 0]},
+        # back to the very back of the hall, settling where the film started
+        {"t": 34.3, "pos": [0.0, -15.4, 4.48], "lens": 30, "aim": [0, 0, 0]},
+        {"t": 36.0, "pos": [0.0, -16.6, 4.5], "lens": 30, "aim": [0, 0, 0]},
       ]}}],
   "beats": [
     (0.0,  "back of the empty mission-control room, already flying in; giant video wall ahead, satellite over Earth on the centre screen"),
@@ -103,7 +105,7 @@ SHOT = {
     (18.4, "hexagon imaging zone appears on the harbor below and scans; status Executing"),
     (24.5, "pull back toward the screen"),
     (30.5, "back through the screen: space is a picture on the wall again"),
-    (35.0, "standing at the back of the empty room"),
+    (36.0, "standing at the very back of the empty room, where the film began"),
   ],
 }
 
