@@ -1,14 +1,15 @@
-"""orca_onboard -- hero film blocking, 48 s, 16:9, no sound. ONE continuous take.
+"""orca_onboard -- hero film blocking, 35 s, 16:9, no sound. ONE continuous take.
+Fast and smooth: nothing lingers.
 
-  0-3     mission-control room: a fast smooth fly-in from the back over the console tiers to the
-          giant video wall and INTO the centre screen -> open space
-  ~9.7    a signal beam rises from Earth to the satellite; card
+  0-3     fly-in over the console tiers of the mission-control room and INTO the
+          centre screen -> open space
+  6       a signal beam rises from Earth to the satellite; card
           "Image the harbor at first light."
-  16-25   close-up of the satellite, slow orbit; card ORCA ONBOARD:
+  10-17   close-up orbit round the satellite; card ORCA ONBOARD:
           Intent received -> Planning -> Guardrails cleared
-  25-34   wide: satellite above Earth, hexagon imaging zone scans the harbor;
+  17-24.5 wide: satellite above Earth, hexagon imaging zone scans the harbor;
           status Executing
-  34-48   pull back: out of space, back through the screen -- space is a picture
+  24.5-35 pull back: out of space, back through the screen -- space is a picture
           on the wall again -- and we stand at the back of the same empty room
 
 The centre screen is a real OPENING in the video wall; the space set sits behind
@@ -21,7 +22,7 @@ Rig: crane (big smooth arcs), speed ceiling raised for the space legs.
 """
 import json, math, os
 
-FPS, SECONDS = 24, 48
+FPS, SECONDS = 24, 35
 NF = FPS * SECONDS
 
 # ------------------------------------------------------------------ room ----
@@ -40,14 +41,14 @@ def surface(x, y):
     return cz + math.sqrt(r * r - (x - cx) ** 2 - (y - cy) ** 2)
 HARBOR = (5.0, 46.0, round(surface(5.0, 46.0), 3))         # the hexagon zone sits here
 BEAM_FOOT = (1.0, 36.0, round(surface(1.0, 36.0), 3))       # the signal leaves Earth here
-WIDE_M = tuple(round((SAT[k] * 0.58 + HARBOR[k] * 0.42), 3) for k in range(3))  # wide framing centre
+WIDE_M = tuple(round((SAT[k] * 0.55 + HARBOR[k] * 0.45), 3) for k in range(3))  # wide framing centre
 
 # -------------------------------------------------------- events (seconds) --
-EV = dict(beam_up=(9.7, 11.0), beam_off=(15.4, 16.2),
-          card1=(10.3, 15.8),
-          card2=(16.6, 24.8), st_intent=17.2, st_plan=19.4, st_guard=21.8,
-          hex_on=25.6, scan=(26.2, 33.6), cone=(25.8, 34.0),
-          card3=(26.2, 33.8))
+EV = dict(beam_up=(6.0, 7.0), beam_off=(9.8, 10.4),
+          card1=(6.4, 10.0),
+          card2=(10.4, 16.8), st_intent=11.0, st_plan=12.6, st_guard=14.2,
+          hex_on=18.4, scan=(19.0, 24.0), cone=(18.6, 24.4),
+          card3=(19.0, 24.2))
 
 # ------------------------------------------------------------------ shot ----
 def orbit(az_deg, r=14.0, dz=2.0):
@@ -59,50 +60,50 @@ SHOT = {
   "name": "orca_onboard", "fps": FPS, "seconds": SECONDS,
   "rig": "crane",
   # space legs cover tens of metres in a few seconds -- that is the point of them
-  "limits": {"max_cam_speed": 10.5},
+  # the space set is scaled down, so its legs cover a lot of metres fast
+  "limits": {"max_cam_speed": 14.0},
   "subject": {   # the ATTENTION point (invisible): screen -> satellite -> wide -> screen
     "mode": "waypoints", "size": [0.4, 0.4, 0.4],
     # hold keys either side of every stop: Catmull-Rom overshoots a lone key
-    "waypoints": [(0.0, *S), (1.0, *S), (4.2, *SAT), (5.2, *SAT), (24.0, *SAT), (25.0, *SAT),
-                  (28.0, *WIDE_M), (29.0, *WIDE_M), (32.5, *WIDE_M), (33.5, *WIDE_M),
-                  (37.5, *SAT), (38.5, *SAT), (40.5, *SAT), (44.0, *S), (45.0, *S), (48.0, *S)]},
+    "waypoints": [(0.0, *S), (1.0, *S), (4.2, *SAT), (5.2, *SAT), (16.0, *SAT), (17.0, *SAT),
+                  (20.0, *WIDE_M), (21.0, *WIDE_M), (23.5, *WIDE_M), (24.5, *WIDE_M),
+                  (29.0, *SAT), (30.5, *SAT), (32.8, *S), (33.8, *S), (35.0, *S)]},
   "shots": [{"t0": 0.0, "t1": SECONDS, "name": "one_take", "camera": {
       "aim_distance": 6.0, "subject_smooth": 12, "lens_smooth": 10,
       "waypoints": [
-        # the room: glide over the console tiers, eye a little above the desks
+        # fly-in: already moving, over the console tiers and through the screen at ~3 s
         {"t": 0.0,  "pos": [0.0, -16.6, 4.5], "lens": 30, "aim": [0, 0, 0]},
-        {"t": 1.5,  "pos": [0.0, -8.3, 4.46], "lens": 30, "aim": [0, 0, 0]},
-        # through the screen at ~3 s (no key on the wall: it would kink the speed)
-        {"t": 5.0,  "pos": [-0.3, 8.4, 4.75], "lens": 30, "aim": [0, 0, 0]},
-        {"t": 8.5,  "pos": [-2.4, 11.2, 5.6], "lens": 30, "aim": [0, 0, 0]},
-        {"t": 12.5, "pos": [-5.3, 13.6, 6.5], "lens": 31, "aim": [0, 0, 0]},
-        # close-up: slow orbit round the satellite, 90 deg in 9 s
-        {"t": 16.0, "pos": orbit(-125), "lens": 32, "aim": [0, 0, 0]},
-        {"t": 19.0, "pos": orbit(-95), "lens": 32, "aim": [0, 0, 0]},
-        {"t": 22.0, "pos": orbit(-65), "lens": 32, "aim": [0, 0, 0]},
-        {"t": 25.0, "pos": orbit(-35), "lens": 32, "aim": [0, 0, 0]},
-        # wide: satellite above Earth, the hexagon below
-        {"t": 30.0, "pos": [44.0, 6.0, 2.0], "lens": 28, "aim": [0, 0, 0]},
-        {"t": 33.5, "pos": [45.5, 11.0, 3.0], "lens": 28, "aim": [0, 0, 0]},
-        # pull back: out of space, back through the screen, into the room
-        {"t": 38.0, "pos": [7.0, 11.0, 7.0], "lens": 30, "aim": [0, 0, 0]},
-        {"t": 40.0, "pos": [0.0, 5.0, 4.5], "lens": 30, "aim": [0, 0, 0]},
-        {"t": 42.0, "pos": [0.0, 0.2, 4.4], "lens": 30, "aim": [0, 0, 0]},
-        {"t": 44.5, "pos": [0.0, -7.0, 4.45], "lens": 30, "aim": [0, 0, 0]},
-        {"t": 48.0, "pos": [0.0, -16.0, 4.5], "lens": 30, "aim": [0, 0, 0]},
+        {"t": 1.5,  "pos": [0.0, -7.3, 4.46], "lens": 30, "aim": [0, 0, 0]},
+        # (no key on the wall: it would kink the speed)
+        # float toward the satellite, then straight into the orbit (no stop)
+        {"t": 5.5,  "pos": [0.0, 8.0, 5.4], "lens": 31, "aim": [0, 0, 0]},
+        # close-up: orbit round the satellite, 90 deg in 8 s, starting dead ahead of it
+        {"t": 9.0,  "pos": orbit(-90), "lens": 32, "aim": [0, 0, 0]},
+        {"t": 11.67, "pos": orbit(-60), "lens": 32, "aim": [0, 0, 0]},
+        {"t": 14.33, "pos": orbit(-30), "lens": 32, "aim": [0, 0, 0]},
+        {"t": 17.0, "pos": orbit(0), "lens": 32, "aim": [0, 0, 0]},
+        # wide: on the side the orbit carries us to -- satellite above Earth, hexagon below
+        {"t": 21.0, "pos": [46.0, 18.0, 2.5], "lens": 28, "aim": [0, 0, 0]},
+        {"t": 24.5, "pos": [47.0, 23.0, 3.5], "lens": 28, "aim": [0, 0, 0]},
+        # pull back: out of space, back through the screen (~30.5 s), into the room
+        {"t": 27.0, "pos": [26.0, 12.0, 7.0], "lens": 29, "aim": [0, 0, 0]},
+        {"t": 29.0, "pos": [8.0, 8.0, 6.0], "lens": 30, "aim": [0, 0, 0]},
+        {"t": 30.3, "pos": [0.0, 3.0, 4.5], "lens": 30, "aim": [0, 0, 0]},
+        {"t": 32.3, "pos": [0.0, -8.0, 4.45], "lens": 30, "aim": [0, 0, 0]},
+        {"t": 35.0, "pos": [0.0, -12.2, 4.5], "lens": 30, "aim": [0, 0, 0]},
       ]}}],
   "beats": [
-    (0.0,  "back of the empty mission-control room; giant video wall ahead, satellite over Earth on the centre screen"),
-    (2.4,  "the centre screen fills the frame"),
+    (0.0,  "back of the empty mission-control room, already flying in; giant video wall ahead, satellite over Earth on the centre screen"),
+    (1.5,  "the centre screen fills the frame"),
     (3.0,  "through the screen: open space, Earth below, satellite ahead"),
-    (9.7,  "a signal beam rises from Earth to the satellite; card: Image the harbor at first light."),
-    (16.0, "close-up of the satellite, slow orbit; card ORCA ONBOARD"),
-    (17.2, "status: Intent received"), (19.4, "status: Planning"), (21.8, "status: Guardrails cleared"),
-    (25.0, "pull out to wide"),
-    (25.6, "hexagon imaging zone appears on the harbor below and scans; status Executing"),
-    (34.0, "pull back toward the screen"),
-    (42.0, "back through the screen: space is a picture on the wall again"),
-    (48.0, "standing at the back of the empty room"),
+    (6.0,  "a signal beam rises from Earth to the satellite; card: Image the harbor at first light."),
+    (10.0, "close-up of the satellite, orbit; card ORCA ONBOARD"),
+    (11.0, "status: Intent received"), (12.6, "status: Planning"), (14.2, "status: Guardrails cleared"),
+    (17.0, "pull out to wide"),
+    (18.4, "hexagon imaging zone appears on the harbor below and scans; status Executing"),
+    (24.5, "pull back toward the screen"),
+    (30.5, "back through the screen: space is a picture on the wall again"),
+    (35.0, "standing at the back of the empty room"),
   ],
 }
 
