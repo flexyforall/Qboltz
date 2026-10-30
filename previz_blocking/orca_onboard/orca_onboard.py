@@ -1,6 +1,6 @@
 """orca_onboard -- hero film blocking, 48 s, 16:9, no sound. ONE continuous take.
 
-  0-6.5   mission-control room: glide from the back over the console tiers to the
+  0-3     mission-control room: a fast smooth fly-in from the back over the console tiers to the
           giant video wall and INTO the centre screen -> open space
   ~9.7    a signal beam rises from Earth to the satellite; card
           "Image the harbor at first light."
@@ -63,7 +63,7 @@ SHOT = {
   "subject": {   # the ATTENTION point (invisible): screen -> satellite -> wide -> screen
     "mode": "waypoints", "size": [0.4, 0.4, 0.4],
     # hold keys either side of every stop: Catmull-Rom overshoots a lone key
-    "waypoints": [(0.0, *S), (4.0, *S), (8.5, *SAT), (9.5, *SAT), (24.0, *SAT), (25.0, *SAT),
+    "waypoints": [(0.0, *S), (1.0, *S), (4.2, *SAT), (5.2, *SAT), (24.0, *SAT), (25.0, *SAT),
                   (28.0, *WIDE_M), (29.0, *WIDE_M), (32.5, *WIDE_M), (33.5, *WIDE_M),
                   (37.5, *SAT), (38.5, *SAT), (40.5, *SAT), (44.0, *S), (45.0, *S), (48.0, *S)]},
   "shots": [{"t0": 0.0, "t1": SECONDS, "name": "one_take", "camera": {
@@ -71,11 +71,11 @@ SHOT = {
       "waypoints": [
         # the room: glide over the console tiers, eye a little above the desks
         {"t": 0.0,  "pos": [0.0, -16.6, 4.5], "lens": 30, "aim": [0, 0, 0]},
-        {"t": 1.5,  "pos": [0.0, -15.6, 4.48], "lens": 30, "aim": [0, 0, 0]},
-        {"t": 3.0,  "pos": [0.0, -12.4, 4.45], "lens": 30, "aim": [0, 0, 0]},
-        # through the screen at ~6.5 s (no key there: a key on the wall kinks the speed)
-        {"t": 9.0,  "pos": [-0.4, 8.2, 4.85], "lens": 30, "aim": [0, 0, 0]},
-        {"t": 12.5, "pos": [-5.4, 11.6, 6.4], "lens": 31, "aim": [0, 0, 0]},
+        {"t": 1.5,  "pos": [0.0, -8.3, 4.46], "lens": 30, "aim": [0, 0, 0]},
+        # through the screen at ~3 s (no key on the wall: it would kink the speed)
+        {"t": 5.0,  "pos": [-0.3, 8.4, 4.75], "lens": 30, "aim": [0, 0, 0]},
+        {"t": 8.5,  "pos": [-2.4, 11.2, 5.6], "lens": 30, "aim": [0, 0, 0]},
+        {"t": 12.5, "pos": [-5.3, 13.6, 6.5], "lens": 31, "aim": [0, 0, 0]},
         # close-up: slow orbit round the satellite, 90 deg in 9 s
         {"t": 16.0, "pos": orbit(-125), "lens": 32, "aim": [0, 0, 0]},
         {"t": 19.0, "pos": orbit(-95), "lens": 32, "aim": [0, 0, 0]},
@@ -93,8 +93,8 @@ SHOT = {
       ]}}],
   "beats": [
     (0.0,  "back of the empty mission-control room; giant video wall ahead, satellite over Earth on the centre screen"),
-    (5.7,  "the centre screen fills the frame"),
-    (6.5,  "through the screen: open space, Earth below, satellite ahead"),
+    (2.4,  "the centre screen fills the frame"),
+    (3.0,  "through the screen: open space, Earth below, satellite ahead"),
     (9.7,  "a signal beam rises from Earth to the satellite; card: Image the harbor at first light."),
     (16.0, "close-up of the satellite, slow orbit; card ORCA ONBOARD"),
     (17.2, "status: Intent received"), (19.4, "status: Planning"), (21.8, "status: Guardrails cleared"),
