@@ -1,0 +1,75 @@
+<!-- Ray button, video version. The ray is a video without text; the label is regular HTML on top.
+     Upload the video/poster files to Webflow Assets and replace the four URLs below. -->
+<a class="ray-vbtn" href="#contact" data-ray-video>
+  <video class="ray-vbtn__video" muted playsinline preload="auto" poster="ray-bg-poster-876x296.jpg" aria-hidden="true">
+    <source src="ray-bg-876x296.webm" type="video/webm" />
+    <source src="ray-bg-876x296.mp4" type="video/mp4" />
+  </video>
+  <span class="ray-vbtn__label">+&nbsp;&nbsp;Talk to us</span>
+</a>
+
+<style>
+  .ray-vbtn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 438px;
+    height: 148px;
+    border-radius: 8px;      /* the video has square corners */
+    overflow: hidden;
+    isolation: isolate;
+    text-decoration: none;
+  }
+  .ray-vbtn__video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .ray-vbtn__label {
+    font-family: "Host Grotesk", sans-serif;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: 3.84px;
+    text-transform: uppercase;
+    color: #fff;
+  }
+  /* Optional: darken the label during the flash, in step with the 1.8 s video */
+  .ray-vbtn.is-playing .ray-vbtn__label { animation: ray-vbtn-text 1.8s linear; }
+  @keyframes ray-vbtn-text {
+    0%, 16.7%  { color: #fff; }
+    27.8%      { color: #8e86b3; }
+    33.3%      { color: #2a2440; }
+    36.1%      { color: #1a1530; }
+    38.9%      { color: #2a2440; }
+    44.4%      { color: #8e86b3; }
+    55.6%, 100% { color: #fff; }
+  }
+</style>
+
+<script>
+  /* Play the ray once each time the button scrolls into view (60% visible). */
+  document.querySelectorAll("[data-ray-video]").forEach(function (btn) {
+    var video = btn.querySelector("video");
+    var armed = true;
+    function play() {
+      video.currentTime = 0;
+      btn.classList.remove("is-playing");
+      void btn.offsetWidth; // restart the label animation
+      btn.classList.add("is-playing");
+      var p = video.play();
+      if (p && p.catch) p.catch(function () {});
+    }
+    video.addEventListener("ended", function () { btn.classList.remove("is-playing"); });
+    new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.intersectionRatio >= 0.6 && armed) { armed = false; setTimeout(play, 300); }
+        else if (!e.isIntersecting) armed = true;
+      });
+    }, { threshold: [0, 0.6] }).observe(btn);
+  });
+</script>

@@ -1,4 +1,5 @@
-/* Ray button — a light ray flies through the button and flashes behind the text.
+/* Ray button — when the button comes into view, a light ray flies through it
+ * and flashes behind the text.
  *
  * Geometry comes from the three Figma frames of "Button - hover-animation"
  * (968:948 → 968:977 → 968:1005). The ray moves along s:
@@ -6,9 +7,13 @@
  *   s = 0.5 frame 2 (flash behind the text, text turns dark)
  *   s = 1   frame 3 (ray leaves on the right)
  *
- * Usage: <a class="ray-btn" data-ray-button> … </a>  (markup in index.html)
- *   data-ray-mode="hover" (default) — one pass on every hover / focus
- *   data-ray-mode="loop"            — passes by itself every data-ray-interval ms
+ * Usage: <a class="ray-btn" data-ray-button> … </a>  (markup in ray-button.html)
+ *   data-ray-mode="inview" (default) — one pass when the button scrolls into view
+ *                                      (60% visible), again each time it comes back
+ *   data-ray-once                    — with "inview": only the first time
+ *   data-ray-delay="300"             — pause after it appears, ms
+ *   data-ray-mode="loop"             — passes by itself every data-ray-interval ms
+ *   data-ray-mode="manual"           — only via el.rayButton.play()
  *
  * Every button also exposes el.rayButton.play(), .seek(s, fade) and .renderAt(ms).
  */
@@ -56,19 +61,35 @@
     this.ray = el.querySelector(".ray-btn__ray");
     this.ellipse = el.querySelector(".ray-btn__ellipse");
     this.dark = el.querySelector(".ray-btn__content--dark");
-    this.mode = el.getAttribute("data-ray-mode") || "hover";
+    this.mode = el.getAttribute("data-ray-mode") || "inview";
     this.interval = parseInt(el.getAttribute("data-ray-interval"), 10) || 3500;
     this.playing = false;
     this.raf = 0;
 
     this.reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+    this.delay = parseInt(el.getAttribute("data-ray-delay"), 10);
+    if (isNaN(this.delay)) this.delay = 300;
+    this.once = el.hasAttribute("data-ray-once");
+
     var self = this;
     if (this.mode === "loop") {
       this.timer = setInterval(function () { self.play(); }, this.interval);
-    } else {
-      el.addEventListener("mouseenter", function () { self.play(); });
-      el.addEventListener("focus", function () { self.play(); });
+    } else if (this.mode === "inview" && "IntersectionObserver" in window) {
+      var armed = true, pending = 0;
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.intersectionRatio >= 0.6 && armed) {
+            armed = false;
+            pending = setTimeout(function () { self.play(); }, self.delay);
+            if (self.once) io.disconnect();
+          } else if (!entry.isIntersecting) {
+            clearTimeout(pending); // left before it played
+            armed = true;          // fully out of view: play again next time
+          }
+        });
+      }, { threshold: [0, 0.6] });
+      io.observe(el);
     }
     this.seek(0, 1);
   }
