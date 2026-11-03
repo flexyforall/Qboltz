@@ -1,0 +1,173 @@
+/* ==========================================================================
+   Ray button — Figma "Button - hover-animation" (node 968:754)
+   Static layers are copied 1:1 from Figma; the ray is moved by ray-button.js.
+   All sizes are Figma pixels (button 438 × 148).
+   ========================================================================== */
+
+.ray-btn {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 438px;
+  height: 148px;
+  padding: 4px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 8px;
+  isolation: isolate;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* Button fill: two radial gradients + rgba(4,0,108,.32) (968:948) */
+  background-image:
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 438 148' xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none'><rect x='0' y='0' height='148' width='438' fill='url(%23grad)' opacity='1'/><defs><radialGradient id='grad' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='10' gradientTransform='matrix(0.0000017674 -33.744 66.554 0.0000021669 219 238.65)'><stop stop-color='rgba(128,113,245,1)' offset='0.23497'/><stop stop-color='rgba(103,87,205,1)' offset='0.31548'/><stop stop-color='rgba(77,61,165,1)' offset='0.39599'/><stop stop-color='rgba(43,35,125,1)' offset='0.47649'/><stop stop-color='rgba(26,22,105,1)' offset='0.51675'/><stop stop-color='rgba(9,9,85,1)' offset='0.557'/><stop stop-color='rgba(5,5,52,1)' offset='0.63216'/><stop stop-color='rgba(2,2,19,1)' offset='0.70732'/><stop stop-color='rgba(1,1,10,1)' offset='0.85366'/><stop stop-color='rgba(0,0,0,1)' offset='1'/></radialGradient></defs></svg>"),
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 438 148' xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none'><rect x='0' y='0' height='148' width='438' fill='url(%23grad)' opacity='1'/><defs><radialGradient id='grad' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='10' gradientTransform='matrix(0.0000023095 -31.512 62.151 0.0000028315 219 273.55)'><stop stop-color='rgba(128,113,245,1)' offset='0.23497'/><stop stop-color='rgba(103,87,205,1)' offset='0.31548'/><stop stop-color='rgba(77,61,165,1)' offset='0.39599'/><stop stop-color='rgba(43,35,125,1)' offset='0.47649'/><stop stop-color='rgba(26,22,105,1)' offset='0.51675'/><stop stop-color='rgba(9,9,85,1)' offset='0.557'/><stop stop-color='rgba(5,5,52,1)' offset='0.63216'/><stop stop-color='rgba(2,2,19,1)' offset='0.70732'/><stop stop-color='rgba(1,1,10,1)' offset='0.85366'/><stop stop-color='rgba(0,0,0,1)' offset='1'/></radialGradient></defs></svg>"),
+    linear-gradient(90deg, rgba(4, 0, 108, 0.32) 0%, rgba(4, 0, 108, 0.32) 100%);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  /* Figma blends the fills; the export drops the modes, these match the frames */
+  background-blend-mode: screen, overlay, normal;
+}
+
+/* "bg" frame (968:953): 1471.73 × 795.08 at (-861, -380), child rotated 171.73° and flipped */
+.ray-btn__stage {
+  position: absolute;
+  left: -861px;
+  top: -380px;
+  width: 1471.727px;
+  height: 795.076px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.ray-btn__bg {
+  position: relative;
+  flex: none;
+  width: 1400px;
+  height: 600px;
+  transform: rotate(171.73deg) scaleY(-1);
+}
+
+/* Static glow "ray1" (968:972), plus-lighter. Figma draws it with an angular
+   (conic) gradient mask inside an SVG foreignObject, which browsers don't render
+   in <img>, so it is rebuilt here: a conic wedge mask over two blurred circles. */
+.ray-btn__glow {
+  position: absolute;
+  left: -1067.38px;
+  top: -1362.8px;
+  width: 3530.172px;
+  height: 3530.172px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  mix-blend-mode: plus-lighter;
+}
+.ray-btn__glow-disc {
+  position: relative;
+  flex: none;
+  width: 3413.507px;
+  height: 3413.507px;
+  border-radius: 50%;
+  opacity: 0.6;
+  transform: rotate(91.99deg);
+  -webkit-mask-image: conic-gradient(from 180deg, #000 0deg, #000 17.4925deg, transparent 35.0195deg, transparent 286.956deg, #000 301.021deg, #000 360deg);
+  mask-image: conic-gradient(from 180deg, #000 0deg, #000 17.4925deg, transparent 35.0195deg, transparent 286.956deg, #000 301.021deg, #000 360deg);
+}
+.ray-btn__glow-disc::before,
+.ray-btn__glow-disc::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.ray-btn__glow-disc::before {
+  left: 1707px;
+  top: 1727px;
+  width: 1849.144px;
+  height: 1849.144px;
+  background: #813dac;
+  opacity: 0.2;
+  filter: blur(150px);
+}
+.ray-btn__glow-disc::after {
+  left: 1706.72px;
+  top: 1727px;
+  width: 647.622px;
+  height: 647.622px;
+  background: #db93f7;
+  opacity: 0.34;
+  filter: blur(81px);
+}
+
+/* Moving ray "Ray" (968:969): the flare image is an alpha mask over a blurred
+   white ellipse. Laid out in button coordinates (the Figma layer sits in the
+   rotated "bg" frame, which comes out horizontal on screen). Position, size and
+   mask are set by ray-button.js. */
+.ray-btn__ray {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  mix-blend-mode: plus-lighter;
+  -webkit-mask-image: url("assets/flare-mask.png");
+  mask-image: url("assets/flare-mask.png");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  will-change: transform, opacity;
+}
+.ray-btn__ellipse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1154.818px; /* ellipse long axis, horizontal on screen */
+  border-radius: 50%;
+  background: #fff;
+  filter: blur(34.1421px);
+  transform: translate(-50%, -50%);
+}
+
+/* Icon and text (968:949): gap 20, padding-right 16 */
+.ray-btn__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding-right: 16px;
+}
+.ray-btn__content--dark {
+  position: absolute;
+  left: 110px; /* same place as the light content */
+  top: 62px;
+  opacity: 0;
+  pointer-events: none;
+}
+.ray-btn__icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.ray-btn__label {
+  font-family: "Host Grotesk", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 3.84px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #fff;
+  margin-right: -3.84px; /* Figma doesn't count the trailing letter-spacing */
+}
+/* Text during the flash (968:981) */
+.ray-btn__content--dark .ray-btn__label {
+  color: transparent;
+  background-image: linear-gradient(180deg, #000 0%, #ceb5ee 83.333%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}

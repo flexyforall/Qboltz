@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ray button — прототип</title>
+  <link rel="preload" href="../../assets/fonts/HostGrotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="ray-button.css" />
+  <style>
+    @font-face {
+      font-family: "Host Grotesk";
+      font-weight: 300 800;
+      font-display: swap;
+      src: url("../../assets/fonts/HostGrotesk-latin.woff2") format("woff2");
+    }
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #121212;
+      color: #cfcfd6;
+      font: 14px/1.5 "Host Grotesk", system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 40px;
+      padding: 64px 16px;
+      box-sizing: border-box;
+    }
+    h1 { margin: 0; font-size: 20px; font-weight: 400; color: #fff; }
+    .stage { display: flex; flex-direction: column; align-items: center; gap: 28px; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 12px 20px;
+    }
+    .controls button {
+      font: inherit;
+      color: #fff;
+      background: #24242a;
+      border: 1px solid #3a3a44;
+      border-radius: 6px;
+      padding: 6px 14px;
+      cursor: pointer;
+    }
+    .controls button:hover { background: #2e2e36; }
+    .controls label { display: flex; align-items: center; gap: 10px; }
+    .controls input[type="range"] { width: 260px; }
+    .hint { max-width: 640px; text-align: center; color: #8a8a96; margin: 0; }
+    .ref { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; }
+    .ref img { max-width: 100%; height: auto; border-radius: 8px; }
+    .ref span { color: #8a8a96; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Talk to us — луч на ховере</h1>
+
+  <div class="stage">
+    <a class="ray-btn" href="#" data-ray-button aria-label="Talk to us">
+      <span class="ray-btn__stage" aria-hidden="true">
+        <span class="ray-btn__bg">
+          <span class="ray-btn__glow"><span class="ray-btn__glow-disc"></span></span>
+        </span>
+      </span>
+      <span class="ray-btn__ray" aria-hidden="true"><span class="ray-btn__ellipse"></span></span>
+      <span class="ray-btn__content" aria-hidden="true">
+        <img class="ray-btn__icon" src="assets/plus.svg" width="16" height="16" alt="" />
+        <span class="ray-btn__label">Talk to us</span>
+      </span>
+      <span class="ray-btn__content ray-btn__content--dark" aria-hidden="true">
+        <img class="ray-btn__icon" src="assets/plus-dark.svg" width="16" height="16" alt="" />
+        <span class="ray-btn__label">Talk to us</span>
+      </span>
+    </a>
+
+    <div class="controls">
+      <button type="button" id="replay">Проиграть</button>
+      <label>Кадр <input type="range" id="scrub" min="0" max="1" step="0.01" value="0" /></label>
+      <button type="button" data-seek="0">Кадр 1</button>
+      <button type="button" data-seek="0.5">Кадр 2</button>
+      <button type="button" data-seek="1">Кадр 3</button>
+    </div>
+    <p class="hint">Наведите курсор на кнопку: луч проходит один раз, вспышка за текстом, текст на время вспышки темнеет. Ползунок прокручивает анимацию вручную, чтобы сверить с кадрами раскадровки.</p>
+  </div>
+
+  <div class="ref">
+    <img src="assets/storyboard.png" width="1694" height="428" alt="Раскадровка из Figma: кадры 1, 2, 3" />
+    <span>Раскадровка из Figma (968:754)</span>
+  </div>
+
+  <script src="ray-button.js"></script>
+  <script>
+    (function () {
+      var btn = document.querySelector("[data-ray-button]");
+      var scrub = document.getElementById("scrub");
+      btn.addEventListener("click", function (e) { e.preventDefault(); });
+      document.getElementById("replay").addEventListener("click", function () { btn.rayButton.play(); });
+      scrub.addEventListener("input", function () { btn.rayButton.seek(parseFloat(scrub.value), 1); });
+      document.querySelectorAll("[data-seek]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          scrub.value = b.getAttribute("data-seek");
+          btn.rayButton.seek(parseFloat(scrub.value), 1);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
