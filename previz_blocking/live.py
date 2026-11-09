@@ -810,12 +810,12 @@ for t, label in ((0.4, 'Operator types + presses Enter'), (2.9, 'TRANSITION: int
     edit.timeline_markers.new(label, frame=f_of(t))
 
 # ---------------------------------------------------------------- show the result
-# PV_Edit only holds the cut (no 3D objects), so open on the space shot and look
-# through its camera. Switch scenes with the scene selector at the top right.
+# PV_Edit only holds the cut (no 3D objects), so open on the first shot (the room)
+# and look through its camera. Switch scenes with the scene selector at the top right.
 win = None if bpy.app.background else bpy.context.window
 if win is not None:
-    win.scene = space
-    space.frame_set(1)
+    win.scene = room_open
+    room_open.frame_set(1)
     for area in win.screen.areas:
         if area.type == 'VIEW_3D':
             for sp in area.spaces:
