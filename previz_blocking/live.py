@@ -355,9 +355,9 @@ SAT_C = Vector((0, 0, SAT_Z))
 DOWN, UP_Y = Vector((0, 0, -1)), Vector((0, 1, 0))
 space_knots = [
     (0.0, Vector((0.0, 0.0, 142.0)), Vector((0.2, 0.0, -2.5))),
-    (2.0, Vector((1.0, 0.0, 137.0)), Vector((1.2, 0.0, -3.0))),
-    (5.5, Vector((6.0, 0.0, 127.0)), Vector((0.6, 0.0, -4.5))),
-    (7.0, Vector((5.0, 0.0, 117.5)), Vector((-3.0, 0.0, -1.5))),
+    (2.0, Vector((0.6, 0.0, 137.0)), Vector((0.6, 0.0, -3.0))),
+    (5.5, Vector((2.8, 0.0, 127.0)), Vector((0.3, 0.0, -4.5))),
+    (7.0, Vector((3.0, 0.0, 117.0)), Vector((-1.5, 0.0, -1.5))),
     (8.0, Vector((0.0, 0.0, Z_ALIGN)), Vector((0.0, 0.0, -1.0))),
 ]
 
@@ -367,9 +367,7 @@ def space_pose(t):
     else:   # lined up under the lens: keep sinking slowly while the optical zoom runs
         u = smooth((t - 8.0) / 4.0)
         loc = Vector((0, 0, Z_ALIGN + (Z_FINAL - Z_ALIGN) * u))
-    w = smooth((t - 6.0) / 1.6)          # look at the satellite, then straight down
-    to_sat = (SAT_C - loc).normalized()
-    fwd = to_sat.lerp(DOWN, w) if t < 7.6 else DOWN.copy()
+    fwd = DOWN.copy()                    # the camera always looks straight down at the Earth
     if t <= 8.0:
         focal = 24.0
     else:                                 # constant-ratio zoom 24 mm -> F_FINAL, settled by 12 s
