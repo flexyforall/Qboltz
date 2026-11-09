@@ -353,17 +353,27 @@ cam_space = make_camera('PV3_Cam_Space', c_space)
 space.camera = cam_space
 SAT_C = Vector((0, 0, SAT_Z))
 DOWN, UP_Y = Vector((0, 0, -1)), Vector((0, 1, 0))
-space_knots = [
-    (0.0, Vector((0.0, 0.0, 142.0)), Vector((0.2, 0.0, -2.5))),
-    (2.0, Vector((0.6, 0.0, 137.0)), Vector((0.6, 0.0, -3.0))),
-    (5.5, Vector((2.8, 0.0, 127.0)), Vector((0.3, 0.0, -4.5))),
-    (7.0, Vector((3.0, 0.0, 117.0)), Vector((-1.5, 0.0, -1.5))),
-    (8.0, Vector((0.0, 0.0, Z_ALIGN)), Vector((0.0, 0.0, -1.0))),
-]
+Z_START, PASS_X = 142.0, 3.2
+
+def _speed(t):                       # speeds up from the first frame, peaks as we pass the satellite
+    return 0.2 + 0.8 * (t / 6.0) if t <= 6.0 else 1.0 - 0.85 * (t - 6.0) / 2.0
+
+_STEPS = 800
+_AREA = [0.0]
+for i in range(_STEPS):
+    a, b = 8.0 * i / _STEPS, 8.0 * (i + 1) / _STEPS
+    _AREA.append(_AREA[-1] + 0.5 * (_speed(a) + _speed(b)) * (b - a))
+
+def _progress(t):                    # 0..1 along the path for t in 0..8 s
+    i = min(_STEPS, max(0, int(t / 8.0 * _STEPS)))
+    return _AREA[i] / _AREA[-1]
 
 def space_pose(t):
     if t <= 8.0:
-        loc = hermite(space_knots, t)
+        u = _progress(t)
+        z = Z_START + (Z_ALIGN - Z_START) * u
+        x = PASS_X * math.sin(math.pi * u ** 1.61)    # one smooth diagonal arc: out to 3.2 m beside
+        loc = Vector((x, 0.0, z))                     # the satellite at its height, back under the lens
     else:   # lined up under the lens: keep sinking slowly while the optical zoom runs
         u = smooth((t - 8.0) / 4.0)
         loc = Vector((0, 0, Z_ALIGN + (Z_FINAL - Z_ALIGN) * u))
