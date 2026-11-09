@@ -530,6 +530,43 @@ for t, label in ((0.0, 'Top view, descending'), (1.0, 'Antenna glow'), (1.5, 'Ca
                  (18.5, 'He swivels back to his desk'), (21.3, 'Pop-up: New images'), (23.0, 'Click: photo opens')):
     edit.timeline_markers.new(label, frame=f_of(t))
 
+# ---------------------------------------------------------------- one-line render from the Python Console
+# import os; bpy.app.driver_namespace["PV3"].motion_render(os.path.expanduser("~/Desktop/orca_shot3_previz.mp4"))
+def motion_render(path, width=1920, height=1080):
+    for name in ("PV3_Space", "PV3_Office", "PV3_Edit"):
+        sc = bpy.data.scenes[name]
+        sc.render.resolution_x, sc.render.resolution_y = width, height
+        sc.render.resolution_percentage = 100
+        for engine in ("BLENDER_EEVEE", "BLENDER_EEVEE_NEXT"):
+            try:
+                sc.render.engine = engine
+                break
+            except TypeError:
+                pass
+        try:
+            sc.eevee.taa_render_samples = 16
+        except Exception:
+            pass
+    ed = bpy.data.scenes["PV3_Edit"]
+    r = ed.render
+    try:
+        r.image_settings.media_type = "VIDEO"
+    except Exception:
+        pass
+    r.image_settings.file_format = "FFMPEG"
+    r.ffmpeg.format, r.ffmpeg.codec = "MPEG4", "H264"
+    r.ffmpeg.constant_rate_factor = "HIGH"
+    r.use_sequencer = True
+    r.filepath = path
+    if bpy.context.window is not None:
+        bpy.context.window.scene = ed
+    bpy.ops.render.render(animation=True, scene=ed.name)
+    print("[PV3] saved", path)
+    return path
+
+import types as _types
+bpy.app.driver_namespace["PV3"] = _types.SimpleNamespace(motion_render=motion_render)
+
 win = None if bpy.app.background else bpy.context.window
 if win is not None:
     win.scene = space
